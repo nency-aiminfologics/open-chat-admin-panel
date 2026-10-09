@@ -22,7 +22,12 @@ const KNOWN_FIELDS = [
   "createdAt",
   "updatedAt",
   "interests",
+  "interestIds",
   "skillIds",
+  "country",
+  "gender",
+  "profession",
+  "dateOfBirth",
   "__v",
 ];
 
@@ -128,6 +133,10 @@ export default function UserDetail() {
             <Info label="Phone" value={user.phone} />
             <Info label="Role" value={<span className="capitalize">{user.role}</span>} />
             <Info label="Joined" value={fmtDate(user.createdAt)} />
+            <Info label="Country" value={user.country} />
+            <Info label="Gender" value={<span className="capitalize">{user.gender}</span>} />
+            <Info label="Profession" value={user.profession} />
+            <Info label="Date of birth" value={fmtDate(user.dateOfBirth)} />
           </div>
           {user.bio && (
             <div className="mt-4">
@@ -153,12 +162,14 @@ export default function UserDetail() {
           </p>
         </section>
 
-        {Array.isArray(user.interests) && (
+        {(Array.isArray(user.interests) || Array.isArray(user.interestIds)) && (
           <section className="card p-5 lg:col-span-2">
             <h2 className="mb-4 font-semibold">Interests</h2>
             <div className="flex flex-wrap gap-2">
-              {user.interests.length === 0 && <p className="text-sm text-slate-400">None</p>}
-              {user.interests.map((i, idx) => (
+              {(user.interests || user.interestIds).length === 0 && (
+                <p className="text-sm text-slate-400">None</p>
+              )}
+              {(user.interests || user.interestIds).map((i, idx) => (
                 <span key={idx} className="rounded-full bg-brand-50 px-3 py-1 text-sm text-brand-700">
                   {typeof i === "string" ? i : i?.name || i?._id}
                 </span>
@@ -167,14 +178,14 @@ export default function UserDetail() {
           </section>
         )}
 
-        {extra.length > 0 && (
+        {/* {extra.length > 0 && (
           <section className="card p-5 lg:col-span-2">
             <h2 className="mb-4 font-semibold">Additional details</h2>
             <pre className="overflow-x-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
               {JSON.stringify(Object.fromEntries(extra), null, 2)}
             </pre>
           </section>
-        )}
+        )} */}
       </div>
 
       <Modal
