@@ -3,36 +3,48 @@
 @tailwind utilities;
 
 body {
-  @apply bg-slate-100 text-slate-800 antialiased;
+  @apply bg-slate-50 text-slate-800 antialiased;
 }
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
   }
   /* Dark text on the light purple keeps AA contrast (white on #AA8FFF is only 2.6:1) */
   .btn-primary {
-    @apply btn bg-brand-400 text-brand-950 hover:bg-brand-500;
+    @apply btn bg-brand-400 text-brand-950 shadow-sm hover:bg-brand-500 active:bg-brand-600;
   }
   .btn-secondary {
-    @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-brand-50;
+    @apply btn border border-slate-200 bg-white text-slate-700 hover:border-brand-200 hover:bg-brand-50;
   }
   .btn-danger {
-    @apply btn bg-danger text-brand-950 hover:brightness-95;
+    @apply btn bg-danger text-white shadow-sm hover:brightness-95;
   }
   .btn-success {
-    @apply btn bg-success text-brand-950 hover:brightness-95;
+    @apply btn bg-success text-brand-950 shadow-sm hover:brightness-95;
   }
+  .btn-ghost {
+    @apply btn bg-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-800;
+  }
+
   .input {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100;
+    @apply w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100;
   }
+  .inputlogin {
+    @apply w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/40 focus:border-brand-400 focus:bg-white/10 focus:ring-2 focus:ring-brand-400/30;
+  }
+
   .card {
-    @apply rounded-xl border border-slate-200 bg-white shadow-sm;
+    @apply rounded-2xl border border-slate-200/80 bg-white shadow-sm;
   }
+  .card-dark {
+    @apply rounded-2xl border border-white/10 bg-white/[0.06] shadow-2xl backdrop-blur-sm;
+  }
+
   .th {
     @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500;
   }
   .td {
-    @apply px-4 py-3 text-sm;
+    @apply px-4 py-3.5 text-sm;
   }
 }

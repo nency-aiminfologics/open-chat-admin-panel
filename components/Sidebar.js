@@ -4,54 +4,121 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 
-export const NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: "▦" },
-  { href: "/users", label: "Users", icon: "☺" },
-  { href: "/identity", label: "Identity Verification", icon: "✔" },
-  { href: "/skill-verification", label: "Skill Verification", icon: "★" },
-  { href: "/catalogue", label: "Skills & Interests", icon: "☰" },
-  { href: "/reports", label: "Reports & Blocks", icon: "⚑" },
-  { href: "/support", label: "Help & Support", icon: "✉" },
-  { href: "/faqs", label: "FAQs", icon: "?" },
-  { href: "/policies", label: "Policy Pages", icon: "§" },
+function Icon({ path, className = "h-5 w-5" }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d={path} />
+    </svg>
+  );
+}
+
+const ICONS = {
+  dashboard: "M3 13h8V3H3v10Zm0 8h8v-6H3v6Zm10 0h8V11h-8v10Zm0-18v6h8V3h-8Z",
+  users: "M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4ZM8 13a3 3 0 1 0-3-3 3 3 0 0 0 3 3Zm8 2c-3.3 0-7 1.7-7 4v2h14v-2c0-2.3-3.7-4-7-4ZM2 21v-1.5C2 17.6 4.4 16 8 16c.6 0 1.2.05 1.8.14A5 5 0 0 0 9 19v2Z",
+  verify: "m9 12 2 2 4-4M12 3l7 3v5c0 5-3.4 8.4-7 10-3.6-1.6-7-5-7-10V6l7-3Z",
+  reports: "M12 9v4m0 4h.01M10.3 3.9 2.7 17a2 2 0 0 0 1.7 3h15.2a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z",
+  support: "M4 4h16v12H7l-3 3V4Z",
+  faq: "M9.1 9a3 3 0 1 1 4.9 2.3c-.7.6-1.5 1.1-1.5 2.2M12 17h.01M4 4h16v16l-4-3H4V4Z",
+  articles: "M4 4h16v2H4V4Zm0 5h16v2H4V9Zm0 5h10v2H4v-2Zm0 5h10v2H4v-2Z",
+  policy: "M12 3l8 3v6c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-3Zm-2 9 2 2 3-4",
+  logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m6 14 5-5-5-5m5 5H9",
+};
+
+const SECTIONS = [
+  {
+    label: "Overview",
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: ICONS.dashboard },
+      { href: "/users", label: "Users", icon: ICONS.users },
+    ],
+  },
+  {
+    label: "Moderation",
+    items: [
+      { href: "/identity", label: "Verification Queue", icon: ICONS.verify },
+      { href: "/reports", label: "Reports", icon: ICONS.reports },
+    ],
+  },
+  {
+    label: "Support",
+    items: [{ href: "/support", label: "Help & Support", icon: ICONS.support }],
+  },
+  {
+    label: "Content",
+    items: [
+      { href: "/faqs", label: "FAQs", icon: ICONS.faq },
+      { href: "/help-articles", label: "Help Articles", icon: ICONS.articles },
+      { href: "/policies", label: "Privacy Policy", icon: ICONS.policy },
+    ],
+  },
 ];
+
+export const NAV = SECTIONS.flatMap((s) => s.items);
+
+function initials(name, email) {
+  const src = (name || email || "A").trim();
+  const parts = src.split(/\s+/);
+  if (parts.length > 1) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return src.slice(0, 2).toUpperCase();
+}
 
 export default function Sidebar({ open, onClose, onLogout, admin }) {
   const pathname = usePathname();
   return (
     <>
-      {open && <div className="fixed inset-0 z-30 bg-slate-900/40 lg:hidden" onClick={onClose} />}
+      {open && <div className="fixed inset-0 z-30 bg-slate-900/50 backdrop-blur-sm lg:hidden" onClick={onClose} />}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-slate-900 text-slate-300 transition-transform lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col bg-brand-950 text-white/70 transition-transform lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex h-16 items-center gap-2 px-5 text-lg py-[40px] font-semibold text-white">
-          <Image src="/assets/logo.svg" alt="Admin Logo" width={100} height={60} />
-          
+        <div className="flex h-20 items-center gap-2 px-6">
+          <Image src="/assets/logo.svg" alt="Admin Logo" width={100} height={48} />
         </div>
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-          {NAV.map((n) => {
-            const active = pathname === n.href || pathname.startsWith(n.href + "/");
-            return (
-              <Link
-                key={n.href}
-                href={n.href}
-                onClick={onClose}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
-                  active ? "bg-brand-400 text-brand-950" : "hover:bg-slate-800 hover:text-white"
-                }`}
-              >
-                <span className="w-5 text-center">{n.icon}</span>
-                {n.label}
-              </Link>
-            );
-          })}
+
+        <nav className="flex-1 space-y-5 overflow-y-auto px-4 pb-4">
+          {SECTIONS.map((section) => (
+            <div key={section.label}>
+              <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-white/30">
+                {section.label}
+              </p>
+              <div className="space-y-0.5">
+                {section.items.map((n) => {
+                  const active = pathname === n.href || pathname.startsWith(n.href + "/");
+                  return (
+                    <Link
+                      key={n.href}
+                      href={n.href}
+                      onClick={onClose}
+                      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                        active ? "bg-brand-400 text-brand-950 shadow-sm" : "text-white/70 hover:bg-white/5 hover:text-white"
+                      }`}
+                    >
+                      <Icon path={n.icon} className="h-[18px] w-[18px] shrink-0" />
+                      <span className="truncate">{n.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
-        <div className="border-t border-slate-800 p-4">
-          <p className="truncate text-sm text-white">{admin?.name}</p>
-          <p className="truncate text-xs text-slate-400">{admin?.email}</p>
-          <button onClick={onLogout} className="mt-3 w-full rounded-lg bg-slate-800 py-2 text-sm hover:bg-slate-700">
+
+        <div className="border-t border-white/10 p-4">
+          <div className="flex items-center gap-3 rounded-xl px-2 py-2">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-400 text-sm font-semibold text-brand-950">
+              {initials(admin?.name, admin?.email)}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-white">{admin?.name || "Admin"}</p>
+              <p className="truncate text-xs text-white/40">{admin?.email}</p>
+            </div>
+          </div>
+          <button
+            onClick={onLogout}
+            className="mt-2 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-white/60 transition hover:bg-white/5 hover:text-white"
+          >
+            <Icon path={ICONS.logout} className="h-[18px] w-[18px]" />
             Log out
           </button>
         </div>

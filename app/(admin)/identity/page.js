@@ -1,85 +1,99 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useStore } from "@/lib/store";
-import { Badge, Empty, PageHeader, StatusChanger, Tabs, fmtDate } from "@/components/ui";
+import { listVerifications } from "@/lib/api";
+import { Badge, Empty, ErrorBanner, PageHeader, Pagination, Spinner, Tabs, fmtDateTime } from "@/components/ui";
+
+const STATUSES = ["submitted", "under_review", "approved", "rejected", "draft"];
 
 export default function IdentityPage() {
-  const { users, setIdentityStatus } = useStore();
-  const [tab, setTab] = useState("pending");
+  const { token } = useStore();
+  const [status, setStatus] = useState("submitted");
+  const [page, setPage] = useState(1);
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const counts = (s) => users.filter((u) => u.identity?.status === s).length;
-  const list = users.filter((u) => u.identity?.status === tab);
+  const load = () => {
+    if (!token) return;
+    setLoading(true);
+    setError("");
+    listVerifications(token, { page, limit: 20, status })
+      .then(setResult)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(load, [token, page, status]);
+
+  const list = result?.items || [];
 
   return (
     <>
-      <PageHeader title="Identity Verification" subtitle="Review documents uploaded by users" />
+      <PageHeader title="Verification Queue" subtitle="Review identity and skill submissions" />
+      <ErrorBanner error={error} onRetry={load} />
       <Tabs
-        value={tab}
-        onChange={setTab}
-        tabs={[
-          { value: "pending", label: "Pending", count: counts("pending") },
-          { value: "verified", label: "Verified", count: counts("verified") },
-          { value: "rejected", label: "Rejected", count: counts("rejected") },
-        ]}
+        value={status}
+        onChange={(v) => {
+          setStatus(v);
+          setPage(1);
+        }}
+        tabs={STATUSES.map((s) => ({ value: s, label: s.replace("_", " ") }))}
       />
 
-      <div className="space-y-4">
-        {list.length === 0 && (
-          <div className="card">
-            <Empty text={`No ${tab} submissions`} />
-          </div>
-        )}
-        {list.map((u) => (
-          <div key={u.id} className="card p-5">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h3 className="font-semibold">{u.name}</h3>
-                <p className="text-xs text-slate-500">
-                  {u.email} · Submitted {fmtDate(u.identity.submittedAt)}
-                </p>
-              </div>
-              <Badge status={u.identity.status} />
-            </div>
-
-            <div className="mb-4 grid gap-4 sm:grid-cols-2">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-slate-400">Document type</p>
-                <p className="text-sm">{u.identity.docType}</p>
-                <p className="mt-2 text-xs uppercase tracking-wide text-slate-400">Document number</p>
-                <p className="text-sm">{u.identity.docNumber}</p>
-              </div>
-              <div>
-                <p className="mb-1 text-xs uppercase tracking-wide text-slate-400">Uploaded files</p>
-                <div className="flex flex-wrap gap-2">
-                  {u.identity.files.map((f) => (
-                    <a
-                      key={f.name}
-                      href={f.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-brand-600 hover:bg-brand-50"
-                    >
-                      📄 {f.name}
-                    </a>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {u.identity.status === "rejected" && u.identity.rejectionReason && (
-              <p className="mb-3 rounded-lg bg-danger-tint px-3 py-2 text-sm text-danger-ink">
-                <b>Rejection reason:</b> {u.identity.rejectionReason}
-              </p>
+      <div className="card overflow-x-auto">
+        {loading ? (
+          <Spinner />
+        ) : (
+          <>
+            <table className="w-full">
+              <thead className="border-b border-slate-200 bg-slate-50">
+                <tr>
+                  <th className="th">Submission ID</th>
+                  <th className="th">User ID</th>
+                  <th className="th">Status</th>
+                  <th className="th">Video review</th>
+                  <th className="th">Updated</th>
+                  <th className="th text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {list.map((v) => (
+                  <tr key={v.id} className="hover:bg-slate-50">
+                    <td className="td font-mono text-xs">{v.id}</td>
+                    <td className="td">
+                      <Link href={`/users/${v.userId}`} className="font-mono text-xs text-brand-600 hover:underline">
+                        {v.userId}
+                      </Link>
+                    </td>
+                    <td className="td">
+                      <Badge status={v.status} />
+                    </td>
+                    <td className="td">{v.videoReviewStatus || "—"}</td>
+                    <td className="td">{fmtDateTime(v.updatedAt)}</td>
+                    <td className="td text-right">
+                      <Link href={`/identity/${v.id}`} className="btn-secondary !px-3 !py-1.5">
+                        Review
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {list.length === 0 && <Empty text={`No ${status.replace("_", " ")} submissions`} />}
+            {result && (
+              <Pagination
+                page={result.page}
+                totalPages={result.totalPages}
+                hasPreviousPage={result.hasPreviousPage}
+                hasNextPage={result.hasNextPage}
+                onChange={setPage}
+              />
             )}
-
-            <StatusChanger
-              status={u.identity.status}
-              reason={u.identity.rejectionReason}
-              onSave={(status, reason) => setIdentityStatus(u.id, status, reason)}
-            />
-          </div>
-        ))}
+          </>
+        )}
       </div>
     </>
   );
