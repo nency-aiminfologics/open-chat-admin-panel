@@ -147,6 +147,57 @@ export const fmtDateTime = (iso) => {
   return isNaN(d) ? "—" : d.toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 };
 
+function initials(name, email) {
+  const src = (name || email || "?").trim();
+  const parts = src.split(/\s+/);
+  if (parts.length > 1) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return src.slice(0, 2).toUpperCase();
+}
+
+/**
+ * Avatar + name + email. Links to the user's detail page by default; pass `link={false}`
+ * when the row already has its own "View" action. Falls back to the raw id if no `user` object is available.
+ */
+export function UserCell({ userId, user, size = "md", link = true, showStatus = true }) {
+  const dim = size === "sm" ? "h-7 w-7" : "h-8 w-8";
+  if (!user) {
+    return link ? (
+      <Link href={`/users/${userId}`} className="font-mono text-xs text-brand-600 hover:underline">
+        {userId}
+      </Link>
+    ) : (
+      <span className="font-mono text-xs text-slate-500">{userId}</span>
+    );
+  }
+  const content = (
+    <>
+      {user.avatarUrl ? (
+        <img src={user.avatarUrl} alt="" className={`${dim} shrink-0 rounded-full object-cover`} />
+      ) : (
+        <span
+          className={`flex ${dim} shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700`}
+        >
+          {initials(user.name, user.email)}
+        </span>
+      )}
+      <span className="min-w-0">
+        <span className="flex items-center gap-1.5">
+          <span className="truncate text-sm font-medium text-slate-800">{user.name || "—"}</span>
+          {showStatus && user.isActive === false && <Badge status="suspended" />}
+        </span>
+        <span className="block truncate text-xs text-slate-500">{user.email}</span>
+      </span>
+    </>
+  );
+  return link ? (
+    <Link href={`/users/${userId}`} className="flex items-center gap-2.5 hover:underline">
+      {content}
+    </Link>
+  ) : (
+    <span className="flex items-center gap-2.5">{content}</span>
+  );
+}
+
 export function Spinner() {
   return (
     <div className="flex items-center justify-center py-14">

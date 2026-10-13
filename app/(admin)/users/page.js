@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { useToast } from "@/lib/toast";
 import { listUsers, updateUser } from "@/lib/api";
-import { Badge, Empty, ErrorBanner, Modal, PageHeader, Pagination, Spinner, fmtDate } from "@/components/ui";
+import { Badge, Empty, ErrorBanner, Modal, PageHeader, Pagination, Spinner, UserCell, fmtDate } from "@/components/ui";
 
 export default function UsersPage() {
   const { token } = useStore();
@@ -99,8 +99,7 @@ export default function UsersPage() {
                 {list.map((u) => (
                   <tr key={u._id} className="hover:bg-slate-50">
                     <td className="td">
-                      <p className="font-medium text-slate-900">{u.name || "—"}</p>
-                      <p className="text-xs text-slate-500">{u.email}</p>
+                      <UserCell userId={u._id} user={u} link={false} showStatus={false} />
                     </td>
                     <td className="td capitalize">{u.role}</td>
                     <td className="td">{fmtDate(u.createdAt)}</td>

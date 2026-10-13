@@ -93,7 +93,16 @@ export default function ContentManager({ title, subtitle, noun, token, list, cre
             </div>
           )}
           {items.map((i) => (
+            
             <div key={i.id} className="card p-5">
+               <div className="flex justify-end items-end mb-4 md:mb-0 shrink-0 gap-2">
+                  <button className="btn-secondary !px-3 !py-1.5" onClick={() => setModal({ ...i })}>
+                    Edit
+                  </button>
+                  <button className="btn-danger !px-3 !py-1.5" onClick={() => toggleActive(i)}>
+                    {i.isActive ? "Hide" : "Show"}
+                  </button>
+                </div>
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -105,15 +114,9 @@ export default function ContentManager({ title, subtitle, noun, token, list, cre
                   )}
                   {i.category && <p className="mt-1 text-xs text-slate-400">Category: {i.category}</p>}
                 </div>
-                <div className="flex shrink-0 gap-2">
-                  <button className="btn-secondary !px-3 !py-1.5" onClick={() => setModal({ ...i })}>
-                    Edit
-                  </button>
-                  <button className="btn-danger !px-3 !py-1.5" onClick={() => toggleActive(i)}>
-                    {i.isActive ? "Hide" : "Show"}
-                  </button>
-                </div>
+               
               </div>
+              
             </div>
           ))}
         </div>

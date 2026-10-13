@@ -22,6 +22,8 @@ const ICONS = {
   articles: "M4 4h16v2H4V4Zm0 5h16v2H4V9Zm0 5h10v2H4v-2Zm0 5h10v2H4v-2Z",
   policy: "M12 3l8 3v6c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-3Zm-2 9 2 2 3-4",
   logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m6 14 5-5-5-5m5 5H9",
+  skills: "M12 15a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 0v6m-7-2 4-4m10 4-4-4",
+  interests: "M12 21s-7-4.35-9.5-8.8C.8 8.6 2.4 5 6 5c2 0 3.2 1.1 4 2.2C10.8 6.1 12 5 14 5c3.6 0 5.2 3.6 3.5 7.2C19 16.65 12 21 12 21Z",
 };
 
 const SECTIONS = [
@@ -44,10 +46,17 @@ const SECTIONS = [
     items: [{ href: "/support", label: "Help & Support", icon: ICONS.support }],
   },
   {
+    label: "Catalog",
+    items: [
+      { href: "/skills", label: "Skills", icon: ICONS.skills },
+      { href: "/interests", label: "Interests", icon: ICONS.interests },
+    ],
+  },
+  {
     label: "Content",
     items: [
       { href: "/faqs", label: "FAQs", icon: ICONS.faq },
-      { href: "/help-articles", label: "Help Articles", icon: ICONS.articles },
+      // { href: "/help-articles", label: "Help Articles", icon: ICONS.articles },
       { href: "/policies", label: "Privacy Policy", icon: ICONS.policy },
     ],
   },

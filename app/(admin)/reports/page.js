@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { useToast } from "@/lib/toast";
 import { listReports, updateReportStatus } from "@/lib/api";
-import { Badge, Empty, ErrorBanner, PageHeader, Pagination, Spinner, Tabs, fmtDate } from "@/components/ui";
+import { Badge, Empty, ErrorBanner, PageHeader, Pagination, Spinner, Tabs, UserCell, fmtDate } from "@/components/ui";
 
 const STATUSES = ["open", "reviewed", "dismissed"];
 
@@ -79,11 +78,11 @@ export default function ReportsPage() {
                 {list.map((r) => (
                   <tr key={r.id} className="hover:bg-slate-50">
                     <td className="td">
-                      <Link href={`/users/${r.reportedUserId}`} className="font-mono text-xs text-brand-600 hover:underline">
-                        {r.reportedUserId}
-                      </Link>
+                      <UserCell userId={r.reportedUserId} user={r.reportedUser} size="sm" />
                     </td>
-                    <td className="td font-mono text-xs">{r.reporterId}</td>
+                    <td className="td">
+                      <UserCell userId={r.reporterId} user={r.reporter} size="sm" />
+                    </td>
                     <td className="td">{r.reason}</td>
                     <td className="td">{fmtDate(r.createdAt)}</td>
                     <td className="td text-right">

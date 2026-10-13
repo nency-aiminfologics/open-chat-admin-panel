@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { listVerifications } from "@/lib/api";
-import { Badge, Empty, ErrorBanner, PageHeader, Pagination, Spinner, Tabs, fmtDateTime } from "@/components/ui";
+import { Badge, Empty, ErrorBanner, PageHeader, Pagination, Spinner, Tabs, UserCell, fmtDateTime } from "@/components/ui";
 
 const STATUSES = ["submitted", "under_review", "approved", "rejected", "draft"];
 
@@ -51,8 +51,7 @@ export default function IdentityPage() {
             <table className="w-full">
               <thead className="border-b border-slate-200 bg-slate-50">
                 <tr>
-                  <th className="th">Submission ID</th>
-                  <th className="th">User ID</th>
+                  <th className="th">User</th>
                   <th className="th">Status</th>
                   <th className="th">Video review</th>
                   <th className="th">Updated</th>
@@ -62,11 +61,8 @@ export default function IdentityPage() {
               <tbody className="divide-y divide-slate-100">
                 {list.map((v) => (
                   <tr key={v.id} className="hover:bg-slate-50">
-                    <td className="td font-mono text-xs">{v.id}</td>
                     <td className="td">
-                      <Link href={`/users/${v.userId}`} className="font-mono text-xs text-brand-600 hover:underline">
-                        {v.userId}
-                      </Link>
+                      <UserCell userId={v.userId} user={v.user} />
                     </td>
                     <td className="td">
                       <Badge status={v.status} />

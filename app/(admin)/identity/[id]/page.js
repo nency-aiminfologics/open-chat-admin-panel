@@ -165,8 +165,12 @@ export default function VerificationDetail() {
       </div>
     );
 
-  const skillIds = (submission.skillIds || []).map((s) => (typeof s === "string" ? { id: s } : { id: s._id || s.id, name: s.name }));
+  const skillList =
+    submission.skills?.length > 0
+      ? submission.skills.map((s) => ({ id: s._id || s.id, name: s.name, category: s.category }))
+      : (submission.skillIds || []).map((s) => (typeof s === "string" ? { id: s } : { id: s._id || s.id, name: s.name }));
   const badgeSkillName = (skillId) => badge?.skills?.find((s) => s.id === skillId)?.name;
+  const user = submission.user;
 
   return (
     <>
@@ -184,16 +188,22 @@ export default function VerificationDetail() {
             <Info
               label="User"
               value={
-                <Link href={`/users/${submission.userId}`} className="text-brand-600 hover:underline">
-                  {submission.userId}
+                <Link href={`/users/${submission.userId}`} className="flex items-center gap-2 text-brand-600 hover:underline">
+                  {user?.avatarUrl && (
+                    <img src={user.avatarUrl} alt="" className="h-6 w-6 shrink-0 rounded-full object-cover" />
+                  )}
+                  <span>
+                    {user?.name || submission.userId}
+                    {user?.email && <span className="text-slate-400"> · {user.email}</span>}
+                  </span>
                 </Link>
               }
             />
             <Info label="Country" value={submission.country} />
             <Info label="ID document type" value={submission.idDocumentType || submission.idDocumentTypeId} />
             <Info label="Government document status" value={submission.governmentDocumentStatus} />
-            <Info label="Reviewed by" value={submission.reviewedBy} />
-            <Info label="Reviewed at" value={fmtDateTime(submission.reviewedAt)} />
+            <Info label="Reviewed by" value={submission.reviewedByUser?.name || submission.reviewedByUser?.email} />
+            <Info label="Reviewed at" value={submission.reviewedAt ? fmtDateTime(submission.reviewedAt) : undefined} />
           </div>
           {submission.adminNotes && (
             <div className="mt-4">
@@ -240,12 +250,15 @@ export default function VerificationDetail() {
         </section>
 
         <section className="card p-5">
-          <h2 className="mb-4 font-semibold">Skills ({skillIds.length})</h2>
-          {skillIds.length === 0 && <p className="text-sm text-slate-400">No skills submitted</p>}
+          <h2 className="mb-4 font-semibold">Skills ({skillList.length})</h2>
+          {skillList.length === 0 && <p className="text-sm text-slate-400">No skills submitted</p>}
           <div className="space-y-4">
-            {skillIds.map((s) => (
+            {skillList.map((s) => (
               <div key={s.id} className="rounded-lg border border-slate-200 p-3">
-                <p className="mb-2 font-mono text-xs text-slate-500">{badgeSkillName(s.id) || s.name || s.id}</p>
+                <p className="mb-2 text-sm font-medium text-slate-700">
+                  {badgeSkillName(s.id) || s.name || s.id}
+                  {s.category && <span className="ml-2 text-xs font-normal capitalize text-slate-400">{s.category}</span>}
+                </p>
                 <ReviewAction pending={busy} onSubmit={(status, reason) => skillReview(s.id, status, reason)} />
               </div>
             ))}
