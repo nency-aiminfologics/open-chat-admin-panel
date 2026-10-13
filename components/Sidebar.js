@@ -21,9 +21,13 @@ const ICONS = {
   faq: "M9.1 9a3 3 0 1 1 4.9 2.3c-.7.6-1.5 1.1-1.5 2.2M12 17h.01M4 4h16v16l-4-3H4V4Z",
   articles: "M4 4h16v2H4V4Zm0 5h16v2H4V9Zm0 5h10v2H4v-2Zm0 5h10v2H4v-2Z",
   policy: "M12 3l8 3v6c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-3Zm-2 9 2 2 3-4",
+  terms: "M8 3h8l4 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm8 0v4h4M9 12h6M9 16h6M9 8h3",
   logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m6 14 5-5-5-5m5 5H9",
   skills: "M12 15a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 0v6m-7-2 4-4m10 4-4-4",
   interests: "M12 21s-7-4.35-9.5-8.8C.8 8.6 2.4 5 6 5c2 0 3.2 1.1 4 2.2C10.8 6.1 12 5 14 5c3.6 0 5.2 3.6 3.5 7.2C19 16.65 12 21 12 21Z",
+  forceUpdate: "M4 4v5h5M20 20v-5h-5M4.6 9a8 8 0 0 1 14.1-3.4L20 7M19.4 15a8 8 0 0 1-14.1 3.4L4 17",
+  notifications: "M15 17H4l1.4-1.4A2 2 0 0 0 6 14.2V11a6 6 0 1 1 12 0v3.2a2 2 0 0 0 .6 1.4L20 17H9m6 0v1a3 3 0 1 1-6 0v-1",
+  subadmin: "M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 0c3 0 6 1.3 6 4v2H6v-2c0-2.7 3-4 6-4Zm6-7 1.3 1.3L21 5",
 };
 
 const SECTIONS = [
@@ -58,11 +62,26 @@ const SECTIONS = [
       { href: "/faqs", label: "FAQs", icon: ICONS.faq },
       // { href: "/help-articles", label: "Help Articles", icon: ICONS.articles },
       { href: "/policies", label: "Privacy Policy", icon: ICONS.policy },
+      { href: "/terms", label: "Terms & Conditions", icon: ICONS.terms },
     ],
+  },
+  {
+    label: "App Settings",
+    items: [
+      { href: "/force-update", label: "Force Update", icon: ICONS.forceUpdate },
+      { href: "/notifications", label: "Notifications", icon: ICONS.notifications },
+    ],
+  },
+  {
+    label: "Administration",
+    items: [{ href: "/sub-admins", label: "Sub Admins", icon: ICONS.subadmin }],
   },
 ];
 
 export const NAV = SECTIONS.flatMap((s) => s.items);
+
+/** Flat { value, label } options for every sidebar page — used to let a sub-admin's access be picked by menu. */
+export const ACCESS_OPTIONS = NAV.map((n) => ({ value: n.href, label: n.label }));
 
 function initials(name, email) {
   const src = (name || email || "A").trim();
@@ -85,7 +104,7 @@ export default function Sidebar({ open, onClose, onLogout, admin }) {
           <Image src="/assets/logo.svg" alt="Admin Logo" width={100} height={48} />
         </div>
 
-        <nav className="flex-1 space-y-5 overflow-y-auto px-4 pb-4">
+        <nav className="scrollbar-hide flex-1 space-y-5 overflow-y-auto px-4 pb-4">
           {SECTIONS.map((section) => (
             <div key={section.label}>
               <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-white/30">

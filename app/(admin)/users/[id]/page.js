@@ -1,11 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { useToast } from "@/lib/toast";
 import { getUserDetail, updateUser } from "@/lib/api";
 import { BackLink, Badge, ErrorBanner, Modal, PageHeader, Spinner, fmtDate, fmtDateTime } from "@/components/ui";
+
+const SOCIAL_ICON_PATHS = {
+  facebook: "M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06c0 5 3.66 9.15 8.44 9.94v-7.03H7.9v-2.91h2.54V9.85c0-2.5 1.49-3.89 3.77-3.89 1.09 0 2.23.2 2.23.2v2.45h-1.26c-1.24 0-1.63.77-1.63 1.56v1.89h2.78l-.45 2.91h-2.33V22c4.78-.79 8.44-4.94 8.44-9.94Z",
+  instagram:
+    "M12 2c2.72 0 3.06.01 4.12.06 1.06.05 1.79.22 2.43.47a4.9 4.9 0 0 1 1.77 1.15 4.9 4.9 0 0 1 1.15 1.77c.25.64.42 1.37.47 2.43C21.99 8.94 22 9.28 22 12s-.01 3.06-.06 4.12c-.05 1.06-.22 1.79-.47 2.43a4.9 4.9 0 0 1-1.15 1.77 4.9 4.9 0 0 1-1.77 1.15c-.64.25-1.37.42-2.43.47C15.06 21.99 14.72 22 12 22s-3.06-.01-4.12-.06c-1.06-.05-1.79-.22-2.43-.47a4.9 4.9 0 0 1-1.77-1.15 4.9 4.9 0 0 1-1.15-1.77c-.25-.64-.42-1.37-.47-2.43C2.01 15.06 2 14.72 2 12s.01-3.06.06-4.12c.05-1.06.22-1.79.47-2.43a4.9 4.9 0 0 1 1.15-1.77A4.9 4.9 0 0 1 5.45.53C6.09.28 6.82.11 7.88.06 8.94.01 9.28 0 12 0Zm0 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 8.25a3.25 3.25 0 1 1 0-6.5 3.25 3.25 0 0 1 0 6.5ZM17.4 4.6a1.17 1.17 0 1 0 0 2.34 1.17 1.17 0 0 0 0-2.34Z",
+  linkedIn:
+    "M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14ZM8.34 18v-8.4H5.67V18h2.67ZM7 8.48a1.55 1.55 0 1 0 0-3.1 1.55 1.55 0 0 0 0 3.1ZM18.34 18v-4.62c0-2.47-1.32-3.62-3.08-3.62-1.42 0-2.06.78-2.41 1.33V9.6h-2.67c.04.75 0 8.4 0 8.4h2.67v-4.69c0-.25.02-.5.1-.68.2-.5.67-1.03 1.46-1.03 1.03 0 1.44.78 1.44 1.93V18h2.49Z",
+};
 
 const SOCIAL_LINKS = [
   { key: "facebook", label: "Facebook" },
@@ -112,6 +121,8 @@ export default function UserDetail() {
   if (!user) return null;
 
   const extra = Object.entries(user).filter(([k]) => !KNOWN_FIELDS.includes(k));
+  // The verification submission's real _id surfaces here as govDocuments[].id (one gov document per submission).
+  const submissionId = user.verification?.govDocuments?.[0]?.id;
 
   return (
     <>
@@ -134,7 +145,7 @@ export default function UserDetail() {
         <Badge status={user.isActive ? "active" : "suspended"} />
         {user.isActive ? (
           <button className="btn-danger" onClick={() => setConfirmDeactivate(true)}>
-            Deactivate account
+            Suspend account
           </button>
         ) : (
           <button className="btn-success" onClick={() => setActive(true)}>
@@ -145,7 +156,7 @@ export default function UserDetail() {
 
       <ErrorBanner error={error} onRetry={load} />
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-1">
         <section className="card p-5">
           <h2 className="mb-4 font-semibold">Profile</h2>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -169,22 +180,7 @@ export default function UserDetail() {
           )}
         </section>
 
-        <section className="card p-5">
-          <h2 className="mb-4 font-semibold">Role</h2>
-          <div className="flex items-center gap-2">
-            <select className="input !w-auto" value={role} onChange={(e) => setRole(e.target.value)}>
-              <option value="admin">Admin</option>
-              <option value="moderator">Moderator</option>
-              <option value="user">User</option>
-            </select>
-            <button className="btn-primary" disabled={savingRole || role === user.role} onClick={saveRole}>
-              {savingRole ? "Saving…" : "Update role"}
-            </button>
-          </div>
-          <p className="mt-2 text-xs text-slate-500">
-            Deactivating the last active admin is rejected by the server. Use caution with role changes.
-          </p>
-        </section>
+        
 
         {(Array.isArray(user.interests) || Array.isArray(user.interestIds)) && (
           <section className="card p-5 lg:col-span-2">
@@ -204,16 +200,27 @@ export default function UserDetail() {
 
         {Array.isArray(user.skills) && (
           <section className="card p-5 lg:col-span-2">
-            <h2 className="mb-4 font-semibold">Skills</h2>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-semibold">Skills</h2>
+              {submissionId && (
+                <Link
+                  href={`/identity/${submissionId}`}
+                  title="View identity verification"
+                  aria-label="View identity verification"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m9 12 2 2 4-4M12 3l7 3v5c0 5-3.4 8.4-7 10-3.6-1.6-7-5-7-10V6l7-3Z" />
+                  </svg>
+                </Link>
+              )}
+            </div>
             {user.skills.length === 0 && <p className="text-sm text-slate-400">None</p>}
             <div className="space-y-2">
               {user.skills.map((s) => (
                 <div key={s.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
                   <div>
                     <span className="font-medium text-slate-800">{s.skill?.name || s.skill?._id}</span>
-                    {s.skill?.category && (
-                      <span className="ml-2 text-xs capitalize text-slate-400">{s.skill.category}</span>
-                    )}
                   </div>
                   <Badge status={s.status} />
                 </div>
@@ -235,9 +242,13 @@ export default function UserDetail() {
                     href={url}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-brand-600 hover:bg-brand-50"
+                    title={label}
+                    aria-label={label}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-brand-600 hover:bg-brand-50"
                   >
-                    {label}
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6 shrink-0">
+                      <path d={SOCIAL_ICON_PATHS[key]} />
+                    </svg>
                   </a>
                 );
               })}

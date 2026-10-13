@@ -40,6 +40,30 @@ function FileLinks({ label, urls }) {
   );
 }
 
+function LinkList({ label, urls }) {
+  const list = Array.isArray(urls) ? urls : urls ? [urls] : [];
+  if (list.length === 0) return <Info label={label} value="None" />;
+  return (
+    <div>
+      <p className="mb-1 text-xs uppercase tracking-wide text-slate-400">{label}</p>
+      <div className="flex flex-col gap-1">
+        {list.map((u, i) => (
+          <a
+            key={i}
+            href={u}
+            target="_blank"
+            rel="noreferrer"
+            className="truncate text-sm text-brand-600 hover:underline"
+            title={u}
+          >
+            🔗 {u}
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const STATUS_LABELS = { approved: "Approve", rejected: "Reject", under_review: "Mark under review" };
 
 function ReviewAction({ title, onSubmit, pending, options = ["approved", "rejected", "under_review"] }) {
@@ -175,7 +199,7 @@ export default function VerificationDetail() {
   return (
     <>
       <BackLink href="/identity" label="Back to queue" />
-      <PageHeader title="Verification submission" subtitle={submission._id || id}>
+      <PageHeader title="Verification submission" >
         <Badge status={submission.status} />
       </PageHeader>
 
@@ -220,28 +244,18 @@ export default function VerificationDetail() {
         <section className="card p-5">
           <h2 className="mb-4 font-semibold">Evidence</h2>
           <div className="space-y-4">
-            <FileLinks label="ID document image" urls={submission.idDocumentImageUrl} />
-            <FileLinks label="Intro images" urls={submission.images} />
-            <FileLinks label="Certificate files" urls={submission.certificateFileUrls} />
-            <FileLinks label="Certificate links" urls={submission.certificateLinks} />
-            {(submission.videoUrl || submission.videoUrls) && (
+            <FileLinks label="Government document" urls={submission.idDocumentImageUrl} />
+             <FileLinks label="Certificate files" urls={submission.certificateFileUrls} />
+            <LinkList label="Certificate links" urls={submission.certificateLinks} />
+            <FileLinks label="Verification images" urls={submission.images} />
+           
+            {/* {(submission.videoUrl || submission.videoUrls) && (
               <FileLinks label="Legacy video(s)" urls={submission.videoUrl || submission.videoUrls} />
-            )}
+            )} */}
           </div>
         </section>
 
-        <section className="card p-5 lg:col-span-2">
-          <h2 className="mb-1 font-semibold">Whole-submission decision</h2>
-          <p className="mb-4 text-sm text-slate-500">
-            Approving verifies every skill below and the government document; rejecting applies the same reason to all of
-            them. Use the individual reviews instead if decisions need to differ per skill or document.
-          </p>
-          <ReviewAction
-            options={["approved", "rejected"]}
-            pending={busy}
-            onSubmit={(status, reason) => bulkReview(status === "approved" ? "approve" : "reject", reason)}
-          />
-        </section>
+      
 
         <section className="card p-5">
           <h2 className="mb-4 font-semibold">Government document</h2>
@@ -263,6 +277,19 @@ export default function VerificationDetail() {
               </div>
             ))}
           </div>
+        </section>
+
+          <section className="card p-5 lg:col-span-2">
+          <h2 className="mb-1 font-semibold">Whole-submission decision</h2>
+          <p className="mb-4 text-sm text-slate-500">
+            Approving verifies every skill below and the government document; rejecting applies the same reason to all of
+            them. Use the individual reviews instead if decisions need to differ per skill or document.
+          </p>
+          <ReviewAction
+            options={["approved", "rejected"]}
+            pending={busy}
+            onSubmit={(status, reason) => bulkReview(status === "approved" ? "approve" : "reject", reason)}
+          />
         </section>
 
         {badge && (

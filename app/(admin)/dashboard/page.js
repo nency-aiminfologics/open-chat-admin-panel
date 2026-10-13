@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { getDashboard } from "@/lib/api";
-import { ErrorBanner, PageHeader, Spinner } from "@/components/ui";
+import { Empty, ErrorBanner, PageHeader, Spinner } from "@/components/ui";
+import { Donut, TrendArea } from "@/components/Charts";
 
 export default function Dashboard() {
   const { token } = useStore();
@@ -54,6 +55,13 @@ export default function Dashboard() {
       ]
     : [];
 
+  const total = data?.users?.total ?? 0;
+  const active = data?.users?.active ?? 0;
+  const inactive = Math.max(total - active, 0);
+  const growth = Array.isArray(data?.users?.growth)
+    ? [...data.users.growth].sort((a, b) => new Date(a.date) - new Date(b.date))
+    : [];
+
   return (
     <>
       <PageHeader title="Dashboard" subtitle="Overview of what needs your attention" />
@@ -61,14 +69,43 @@ export default function Dashboard() {
       {loading ? (
         <Spinner />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {cards.map((c) => (
-            <Link key={c.label} href={c.href} className="card p-5 transition hover:shadow-md">
-              <p className="text-sm text-slate-500">{c.label}</p>
-              <p className={`mt-2 inline-block rounded-lg px-3 py-1 text-3xl font-semibold ${c.tone}`}>{c.value}</p>
-            </Link>
-          ))}
-        </div>
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {cards.map((c) => (
+              <Link key={c.label} href={c.href} className="card p-5 transition hover:shadow-md">
+                <p className="text-sm text-slate-500">{c.label}</p>
+                <p className={`mt-2 inline-block rounded-lg px-3 py-1 text-3xl font-semibold ${c.tone}`}>{c.value}</p>
+              </Link>
+            ))}
+          </div>
+
+          <div className="mt-6 grid gap-6 lg:grid-cols-2">
+            <div className="card p-5">
+              <h2 className="mb-4 font-semibold text-slate-800">Users by status</h2>
+              {total > 0 ? (
+                <Donut
+                  centerLabel="Total users"
+                  centerValue={total}
+                  data={[
+                    { label: "Active", value: active, color: "text-success", dot: "bg-success" },
+                    { label: "Inactive", value: inactive, color: "text-danger", dot: "bg-danger" },
+                  ]}
+                />
+              ) : (
+                <Empty text="No users yet" />
+              )}
+            </div>
+
+            <div className="card p-5">
+              <h2 className="mb-4 font-semibold text-slate-800">New users over time</h2>
+              {growth.length >= 2 ? (
+                <TrendArea data={growth} seriesLabel="New users" />
+              ) : (
+                <Empty text="Not enough signup history to chart yet" />
+              )}
+            </div>
+          </div>
+        </>
       )}
     </>
   );

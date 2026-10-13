@@ -6,7 +6,7 @@ import { useToast } from "@/lib/toast";
 import { getTicketDetail, listTickets, replyTicket, setTicketStatus } from "@/lib/api";
 import { Badge, Empty, ErrorBanner, PageHeader, Pagination, Spinner, fmtDate, fmtDateTime } from "@/components/ui";
 
-const FILTERS = ["pending", "open", "success", "rejected"];
+const FILTERS = ["pending", "success", "rejected"];
 const POLL_INTERVAL = 5000;
 
 // The backend prefixes admin replies with "[Admin] "; strip it since the bubble already labels the sender.

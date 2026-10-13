@@ -8,6 +8,41 @@ import { Badge, Empty, ErrorBanner, PageHeader, Pagination, Spinner, Tabs, UserC
 
 const STATUSES = ["open", "reviewed", "dismissed"];
 
+const ICON_TONE = {
+  neutral: "border border-slate-200 bg-white text-slate-600 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700",
+  success: "border border-success/30 bg-white text-success hover:bg-success-tint",
+};
+
+function IconButton({ label, tone = "neutral", ...props }) {
+  return (
+    <button
+      {...props}
+      type="button"
+      aria-label={label}
+      className={`group relative flex h-9 w-9 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-50 ${ICON_TONE[tone]}`}
+    >
+      {props.children}
+      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-lg transition group-hover:opacity-100">
+        {label}
+      </span>
+    </button>
+  );
+}
+
+const XCircleIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-[18px] w-[18px]">
+    <path strokeLinecap="round" strokeLinejoin="round" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+  </svg>
+);
+
+const CheckCircleIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-[18px] w-[18px]">
+    <path strokeLinecap="round" strokeLinejoin="round" d="m9 12 2 2 4-4" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+  </svg>
+);
+
 export default function ReportsPage() {
   const { token } = useStore();
   const toast = useToast();
@@ -89,20 +124,21 @@ export default function ReportsPage() {
                       <div className="flex justify-end gap-2">
                         {r.status === "open" && (
                           <>
-                            <button
-                              className="btn-secondary !px-3 !py-1.5"
+                            <IconButton
+                              label="Dismiss"
                               disabled={busyId === r.id}
                               onClick={() => setStatusFor(r.id, "dismissed")}
                             >
-                              Dismiss
-                            </button>
-                            <button
-                              className="btn-success !px-3 !py-1.5"
+                              <XCircleIcon />
+                            </IconButton>
+                            <IconButton
+                              tone="success"
+                              label="Reviewed"
                               disabled={busyId === r.id}
                               onClick={() => setStatusFor(r.id, "reviewed")}
                             >
-                              Mark reviewed
-                            </button>
+                              <CheckCircleIcon />
+                            </IconButton>
                           </>
                         )}
                         {r.status !== "open" && <Badge status={r.status} />}

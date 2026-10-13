@@ -12,7 +12,7 @@ const BADGE = {
   success: "bg-success-tint text-success-ink ring-success/30",
   true: "bg-success-tint text-success-ink ring-success/30",
   pending: "bg-warn-tint text-warn-ink ring-warn/30",
-  open: "bg-warn-tint text-warn-ink ring-warn/30",
+
   draft: "bg-warn-tint text-warn-ink ring-warn/30",
   submitted: "bg-warn-tint text-warn-ink ring-warn/30",
   under_review: "bg-brand-100 text-brand-700 ring-brand-300",
@@ -81,7 +81,7 @@ export function Modal({ open, onClose, title, children, footer }) {
             ×
           </button>
         </div>
-        <div className="max-h-[70vh] overflow-y-auto px-5 py-4">{children}</div>
+        <div className="scrollbar-hide max-h-[70vh] overflow-y-auto px-5 py-4">{children}</div>
         {footer && <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3.5">{footer}</div>}
       </div>
     </div>
