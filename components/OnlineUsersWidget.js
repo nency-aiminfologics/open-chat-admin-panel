@@ -7,8 +7,12 @@ import { ApiError, listOnlineUsers } from "@/lib/api";
 /** Modest polling only — presence is a live observation, never a per-second refresh. */
 const REFRESH_MS = 30000;
 const FETCH_LIMIT = 8;
-const FACEPILE_LIMIT = 6;
+const FACEPILE_LIMIT = 5;
 const LIST_LIMIT = 5;
+
+// Static class names so Tailwind doesn't purge them.
+// first avatar = z-0, second = z-10, third = z-20 ... (later avatars sit on top)
+const Z_CLASSES = ["z-0", "z-10", "z-20", "z-30", "z-40", "z-50"];
 
 const PeopleIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
@@ -41,18 +45,21 @@ function countryFlag(code) {
   return String.fromCodePoint(...[...upper].map((c) => 127397 + c.charCodeAt(0)));
 }
 
-function FacepileAvatar({ user }) {
+/** Round marker-style avatar: overlaps the previous one, later avatars layered on top. */
+function FacepileAvatar({ user, index }) {
   const id = user._id || user.id;
   return (
     <Link
       href={`/users/${id}`}
       title={user.name || user.email}
-      className="relative block h-10 w-10 shrink-0 rounded-full ring-2 ring-white transition hover:z-10 hover:scale-110"
+      className={`relative block h-10 w-10 shrink-0 rounded-full
+        ${index > 0 ? "ml-1" : ""} ${Z_CLASSES[index] || "z-50"}
+        transition hover:scale-110 hover:!z-[70]`}
     >
       {user.avatarUrl ? (
-        <img src={user.avatarUrl} alt="" className="h-10 w-10 rounded-full object-cover" />
+        <img src={user.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
       ) : (
-        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
+        <span className="flex h-full w-full items-center justify-center rounded-full bg-brand-400 text-xs font-semibold text-white">
           {initials(user.name, user.email)}
         </span>
       )}
@@ -192,15 +199,19 @@ export default function OnlineUsersWidget({ token, onCount }) {
       ) : (
         <>
           <div className="mt-5 flex items-center">
-            <div className="flex -space-x-2.5">
-              {facepile.map((u) => (
-                <FacepileAvatar key={u._id || u.id} user={u} />
+            <div className="flex items-center">
+              {facepile.map((u, index) => (
+                <FacepileAvatar key={u._id || u.id} user={u} index={index} />
               ))}
             </div>
             {facepileOverflow > 0 && (
-              <span className="relative -ml-2.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-xs font-semibold text-brand-700 ring-2 ring-white">
-                +{facepileOverflow}
-              </span>
+              <Link
+                href="/users"
+                title={`${facepileOverflow} more online`}
+                className="relative z-[60]  flex h-10 min-w-10 shrink-0 items-center
+                 justify-center rounded-full  bg-brand-50 px-1.5 text-xs font-semibold text-brand-700 transition hover:scale-110">
+                {facepileOverflow}+
+              </Link>
             )}
           </div>
 
