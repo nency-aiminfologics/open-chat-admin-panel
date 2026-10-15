@@ -1,6 +1,7 @@
 "use client";
 
 import { useStore } from "@/lib/store";
+import { PERMISSIONS } from "@/lib/permissions";
 import { createFaq, listFaqs, updateFaq } from "@/lib/api";
 import ContentManager from "@/components/ContentManager";
 
@@ -24,7 +25,7 @@ const FIELDS = [
 ];
 
 export default function FaqsPage() {
-  const { token } = useStore();
+  const { token, can } = useStore();
   return (
     <ContentManager
       title="FAQs"
@@ -36,6 +37,7 @@ export default function FaqsPage() {
       update={updateFaq}
       fields={FIELDS}
       titleKey="question"
+      canManage={can(PERMISSIONS.contentManage)}
       subtitleKey="answer"
     />
   );

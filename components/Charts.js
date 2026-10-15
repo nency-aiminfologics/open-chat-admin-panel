@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { fmtDate } from "@/components/ui";
 
 /**
@@ -174,5 +174,107 @@ export function TrendArea({ data, seriesLabel = "New users", height = 220 }) {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Partial-ring gauge for a single live value against a max (e.g. online users out of
+ * active users). Rounded cap, optional pulsing "live" dot, big center figure.
+ */
+export function RadialGauge({
+  value,
+  max,
+  size = 148,
+  thickness = 14,
+  color = "text-success",
+  trackColor = "text-slate-100",
+  centerValue,
+  centerLabel,
+  live = false,
+}) {
+  const safeMax = max > 0 ? max : Math.max(value, 1);
+  const frac = Math.min(Math.max(safeMax ? value / safeMax : 0, 0), 1);
+  const r = (size - thickness) / 2;
+  const c = 2 * Math.PI * r;
+  const dash = frac * c;
+
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} className="-rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={thickness}
+          className={trackColor}
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={thickness}
+          strokeLinecap="round"
+          strokeDasharray={`${dash} ${c - dash}`}
+          className={`${color} transition-[stroke-dasharray] duration-700 ease-out`}
+        />
+      </svg>
+      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-0.5">
+        {live && (
+          <span className="relative mb-0.5 flex h-2 w-2">
+            <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${color.replace("text-", "bg-")}`} />
+            <span className={`relative inline-flex h-2 w-2 rounded-full ${color.replace("text-", "bg-")}`} />
+          </span>
+        )}
+        <span className="text-3xl font-semibold tabular-nums text-slate-800">{centerValue}</span>
+        {centerLabel && <span className="max-w-[9ch] text-center text-[11px] leading-tight text-slate-400">{centerLabel}</span>}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Minimal trend line for a short rolling buffer of samples (no axes/labels) — used where a
+ * full TrendArea would be too heavy, e.g. a live-polled count inside a compact widget.
+ */
+export function Sparkline({ data, width = 240, height = 56, color = "text-success" }) {
+  const gradientId = useId();
+  if (!data || data.length < 2) {
+    return (
+      <div className="flex items-center justify-center text-xs text-slate-300" style={{ width, height }}>
+        Collecting trend…
+      </div>
+    );
+  }
+
+  const padding = 4;
+  const innerW = width - padding * 2;
+  const innerH = height - padding * 2;
+  const maxV = Math.max(...data, 1);
+  const minV = Math.min(...data, 0);
+  const span = Math.max(maxV - minV, 1);
+
+  const x = (i) => padding + (i / (data.length - 1)) * innerW;
+  const y = (v) => padding + innerH - ((v - minV) / span) * innerH;
+
+  const linePath = data.map((v, i) => `${i === 0 ? "M" : "L"} ${x(i).toFixed(2)} ${y(v).toFixed(2)}`).join(" ");
+  const areaPath = `${linePath} L ${x(data.length - 1).toFixed(2)} ${height - padding} L ${x(0).toFixed(2)} ${height - padding} Z`;
+  const lastIdx = data.length - 1;
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} className={color}>
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="currentColor" stopOpacity="0.28" />
+          <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={areaPath} fill={`url(#${gradientId})`} stroke="none" />
+      <path d={linePath} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={x(lastIdx)} cy={y(data[lastIdx])} r="3.5" fill="currentColor" stroke="white" strokeWidth="1.5" />
+    </svg>
   );
 }

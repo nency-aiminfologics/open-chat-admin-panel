@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { canOpenPage } from "@/lib/permissions";
 
 function Icon({ path, className = "h-5 w-5" }) {
   return (
@@ -28,6 +29,7 @@ const ICONS = {
   forceUpdate: "M4 4v5h5M20 20v-5h-5M4.6 9a8 8 0 0 1 14.1-3.4L20 7M19.4 15a8 8 0 0 1-14.1 3.4L4 17",
   notifications: "M15 17H4l1.4-1.4A2 2 0 0 0 6 14.2V11a6 6 0 1 1 12 0v3.2a2 2 0 0 0 .6 1.4L20 17H9m6 0v1a3 3 0 1 1-6 0v-1",
   subadmin: "M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 0c3 0 6 1.3 6 4v2H6v-2c0-2.7 3-4 6-4Zm6-7 1.3 1.3L21 5",
+  password: "M12 15v2m-6 4h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2Zm2-10V7a4 4 0 1 1 8 0v4",
 };
 
 const SECTIONS = [
@@ -80,9 +82,6 @@ const SECTIONS = [
 
 export const NAV = SECTIONS.flatMap((s) => s.items);
 
-/** Flat { value, label } options for every sidebar page — used to let a sub-admin's access be picked by menu. */
-export const ACCESS_OPTIONS = NAV.map((n) => ({ value: n.href, label: n.label }));
-
 function initials(name, email) {
   const src = (name || email || "A").trim();
   const parts = src.split(/\s+/);
@@ -90,8 +89,16 @@ function initials(name, email) {
   return src.slice(0, 2).toUpperCase();
 }
 
-export default function Sidebar({ open, onClose, onLogout, admin }) {
+export default function Sidebar({ open, onClose, onLogout, admin, navLocked = false }) {
   const pathname = usePathname();
+  // Hidden pages are only a convenience — the backend still checks every scope itself.
+  const sections = navLocked
+    ? []
+    : SECTIONS.map((s) => ({
+        ...s,
+        items: s.items.filter((n) => canOpenPage(admin, n.href)),
+      })).filter((s) => s.items.length > 0);
+
   return (
     <>
       {open && <div className="fixed inset-0 z-30 bg-slate-900/50 backdrop-blur-sm lg:hidden" onClick={onClose} />}
@@ -105,7 +112,12 @@ export default function Sidebar({ open, onClose, onLogout, admin }) {
         </div>
 
         <nav className="scrollbar-hide flex-1 space-y-5 overflow-y-auto px-4 pb-4">
-          {SECTIONS.map((section) => (
+          {navLocked && (
+            <p className="rounded-xl bg-white/5 px-3 py-2.5 text-xs text-white/50">
+              Set your password to unlock the admin panel.
+            </p>
+          )}
+          {sections.map((section) => (
             <div key={section.label}>
               <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-white/30">
                 {section.label}
@@ -142,6 +154,14 @@ export default function Sidebar({ open, onClose, onLogout, admin }) {
               <p className="truncate text-xs text-white/40">{admin?.email}</p>
             </div>
           </div>
+          <Link
+            href="/change-password"
+            onClick={onClose}
+            className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-white/60 transition hover:bg-white/5 hover:text-white"
+          >
+            <Icon path={ICONS.password} className="h-[18px] w-[18px]" />
+            Change password
+          </Link>
           <button
             onClick={onLogout}
             className="mt-2 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-white/60 transition hover:bg-white/5 hover:text-white"

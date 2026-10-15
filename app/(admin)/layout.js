@@ -1,21 +1,47 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
+import { PAGE_ACCESS, canOpenPage, firstAllowedPage } from "@/lib/permissions";
 import Sidebar from "@/components/Sidebar";
 
+/** Pages every signed-in admin reaches regardless of scope. */
+const ALWAYS_ALLOWED = ["/change-password"];
+
+/** Maps `/users/abc123` back to the `/users` entry that owns the permission rule. */
+function pageRoot(pathname) {
+  return Object.keys(PAGE_ACCESS).find((href) => pathname === href || pathname.startsWith(href + "/")) || pathname;
+}
+
 export default function AdminLayout({ children }) {
-  const { admin, ready, logout } = useStore();
+  const { admin, ready, logout, mustChangePassword } = useStore();
   const router = useRouter();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  // Auth guard
-  useEffect(() => {
-    if (ready && !admin) router.replace("/login");
-  }, [ready, admin, router]);
+  const root = pageRoot(pathname);
+  const allowedHere = ALWAYS_ALLOWED.includes(root) || canOpenPage(admin, root);
 
-  if (!ready || !admin) {
+  // Auth guard, forced password setup, then page scope.
+  useEffect(() => {
+    if (!ready) return;
+    if (!admin) {
+      router.replace("/login");
+      return;
+    }
+    // A mustChangePassword account cannot use any protected feature until it sets a password.
+    if (mustChangePassword && pathname !== "/change-password") {
+      router.replace("/change-password");
+      return;
+    }
+    if (!allowedHere) {
+      const fallback = firstAllowedPage(admin);
+      router.replace(fallback || "/change-password");
+    }
+  }, [ready, admin, mustChangePassword, pathname, allowedHere, router]);
+
+  if (!ready || !admin || !allowedHere || (mustChangePassword && pathname !== "/change-password")) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-brand-500" />
@@ -29,6 +55,7 @@ export default function AdminLayout({ children }) {
         open={open}
         onClose={() => setOpen(false)}
         admin={admin}
+        navLocked={mustChangePassword}
         onLogout={() => {
           logout().finally(() => router.replace("/login"));
         }}

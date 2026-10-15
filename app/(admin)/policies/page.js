@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
+import { PERMISSIONS } from "@/lib/permissions";
 import { useToast } from "@/lib/toast";
 import { getPrivacyPolicy, putPrivacyPolicy } from "@/lib/api";
 import { ErrorBanner, Field, PageHeader, Spinner, fmtDateTime } from "@/components/ui";
@@ -9,7 +10,8 @@ import { ErrorBanner, Field, PageHeader, Spinner, fmtDateTime } from "@/componen
 const EMPTY = { title: "Privacy Policy", contentHtml: "", version: "1.0", effectiveAt: "", isActive: true };
 
 export default function PoliciesPage() {
-  const { token } = useStore();
+  const { token, can } = useStore();
+  const canManage = can(PERMISSIONS.contentManage);
   const toast = useToast();
   const [policy, setPolicy] = useState(null);
   const [form, setForm] = useState(EMPTY);
@@ -126,9 +128,11 @@ export default function PoliciesPage() {
             onChange={(e) => setForm({ ...form, contentHtml: e.target.value })}
           />
         )}
-        <button className="btn-primary" disabled={saving} onClick={save}>
-          {saving ? "Saving…" : "Save policy"}
-        </button>
+        {canManage && (
+          <button className="btn-primary" disabled={saving} onClick={save}>
+            {saving ? "Saving…" : "Save policy"}
+          </button>
+        )}
       </div>
     </>
   );

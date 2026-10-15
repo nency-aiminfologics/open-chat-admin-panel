@@ -3,9 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { useToast } from "@/lib/toast";
-import { createSubAdmin, deleteSubAdmin, listSubAdmins, updateSubAdmin } from "@/lib/api";
-import { ACCESS_OPTIONS } from "@/components/Sidebar";
-import { Badge, Empty, ErrorBanner, Field, Modal, PageHeader, Spinner } from "@/components/ui";
+import {
+  createSubAdmin,
+  deleteSubAdmin,
+  listPermissions,
+  listSubAdmins,
+  resendSubAdminInvitation,
+  updateSubAdmin,
+} from "@/lib/api";
+import { PERMISSION_GROUPS, PERMISSION_LABELS } from "@/lib/permissions";
+import { Badge, Empty, ErrorBanner, Field, Modal, PageHeader, Pagination, Spinner, fmtDate } from "@/components/ui";
 
 const EMPTY_FORM = { name: "", email: "", access: [], isActive: true };
 
@@ -21,7 +28,7 @@ function IconButton({ label, tone = "neutral", ...props }) {
       {...props}
       type="button"
       aria-label={label}
-      className={`group relative flex h-9 w-9 items-center justify-center rounded-lg transition ${ICON_TONE[tone]}`}
+      className={`group relative flex h-9 w-9 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-50 ${ICON_TONE[tone]}`}
     >
       {props.children}
       <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-lg transition group-hover:opacity-100">
@@ -52,98 +59,78 @@ const CheckCircleIcon = () => (
   </svg>
 );
 
+const MailIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-[18px] w-[18px]">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5 12 13l9-5.5M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z" />
+  </svg>
+);
+
 const TrashIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-[18px] w-[18px]">
     <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
   </svg>
 );
 
-const ChevronIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4 shrink-0">
-    <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
-  </svg>
-);
+/**
+ * Grouped checkbox picker over the backend's resource scopes. Only scopes the API
+ * returned from `GET /admin/permissions` are offered — page URLs are never sent.
+ */
+function AccessPicker({ allowed, selected, onChange }) {
+  const groups = PERMISSION_GROUPS.map((g) => ({
+    ...g,
+    items: g.items.filter(([value]) => allowed.includes(value)),
+  })).filter((g) => g.items.length > 0);
 
-/** Checkbox-list dropdown for picking several access options. */
-function MultiSelect({ options, selected, onChange }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  // Any scope the backend allows that this build has no label for is still selectable.
+  const known = PERMISSION_GROUPS.flatMap((g) => g.items.map(([v]) => v));
+  const extras = allowed.filter((p) => !known.includes(p));
 
-  useEffect(() => {
-    if (!open) return;
-    const onDocClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, [open]);
-
-  const toggle = (value) => {
+  const toggle = (value) =>
     onChange(selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value]);
-  };
+
+  const row = ([value, label]) => (
+    <label
+      key={value}
+      className="flex items-start gap-2.5 rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+    >
+      <input
+        type="checkbox"
+        className="mt-0.5 h-4 w-4 accent-brand-400"
+        checked={selected.includes(value)}
+        onChange={() => toggle(value)}
+      />
+      <span>
+        <span className="block">{label}</span>
+        <code className="text-[11px] text-slate-400">{value}</code>
+      </span>
+    </label>
+  );
 
   return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="input flex items-center justify-between !py-2 text-left"
-      >
-        <span className={selected.length ? "text-slate-800" : "text-slate-400"}>
-          {selected.length ? `${selected.length} page${selected.length > 1 ? "s" : ""} selected` : "Select access…"}
-        </span>
-        <ChevronIcon />
-      </button>
-
-      {selected.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {options
-            .filter((o) => selected.includes(o.value))
-            .map((o) => (
-              <span
-                key={o.value}
-                className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700"
-              >
-                {o.label}
-                <button
-                  type="button"
-                  aria-label={`Remove ${o.label}`}
-                  onClick={() => toggle(o.value)}
-                  className="text-brand-400 hover:text-brand-700"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
+    <div className="scrollbar-custom max-h-72 overflow-y-auto rounded-lg border border-slate-200 p-2">
+      {groups.map((g) => (
+        <div key={g.label} className="mb-2">
+          <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{g.label}</p>
+          {g.items.map(row)}
+        </div>
+      ))}
+      {extras.length > 0 && (
+        <div className="mb-2">
+          <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Other</p>
+          {extras.map((p) => row([p, p]))}
         </div>
       )}
-
-      {open && (
-        <div className="scrollbar-custom absolute z-20 mt-1.5 max-h-[100px] w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
-          {options.map((o) => (
-            <label
-              key={o.value}
-              className="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-slate-700 hover:bg-slate-50"
-            >
-              <input
-                type="checkbox"
-                className="h-4 w-4 accent-brand-400"
-                checked={selected.includes(o.value)}
-                onChange={() => toggle(o.value)}
-              />
-              {o.label}
-            </label>
-          ))}
-        </div>
-      )}
+      {allowed.length === 0 && <p className="px-2 py-3 text-sm text-slate-400">No permissions available.</p>}
     </div>
   );
 }
 
 export default function SubAdminsPage() {
-  const { token } = useStore();
+  const { token, fullAdmin } = useStore();
   const toast = useToast();
-  const [items, setItems] = useState([]);
+  const [page, setPage] = useState(1);
+  const [result, setResult] = useState(null);
+  const [allowed, setAllowed] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [modal, setModal] = useState(null);
@@ -152,18 +139,28 @@ export default function SubAdminsPage() {
   const [formError, setFormError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [busyId, setBusyId] = useState(null);
+  const loadedPermissions = useRef(false);
 
   const load = () => {
     if (!token) return;
     setLoading(true);
     setError("");
-    listSubAdmins(token)
-      .then((d) => setItems(Array.isArray(d) ? d : d?.items || []))
+    listSubAdmins(token, { page, limit: 20 })
+      .then((d) => setResult(Array.isArray(d) ? { items: d } : d))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [token]);
+  useEffect(load, [token, page]);
+
+  useEffect(() => {
+    if (!token || loadedPermissions.current) return;
+    loadedPermissions.current = true;
+    listPermissions(token)
+      .then((d) => setAllowed(d?.items || []))
+      .catch((e) => setError(e.message));
+  }, [token]);
 
   const openAdd = () => {
     setForm(EMPTY_FORM);
@@ -180,22 +177,31 @@ export default function SubAdminsPage() {
   const save = async () => {
     const name = form.name.trim();
     const email = form.email.trim();
-    if (!name || !email) {
+    if (!name || (!modal.id && !email)) {
       setFormError("Name and email are required");
       return;
     }
     if (form.access.length === 0) {
-      setFormError("Select at least one page this sub admin can access");
+      setFormError("Select at least one permission this sub admin needs");
       return;
     }
     setFormError("");
     setSaving(true);
     try {
-      const body = { name, email, access: form.access, isActive: form.isActive };
-      if (modal.id) await updateSubAdmin(token, modal.id, body);
-      else await createSubAdmin(token, body);
+      if (modal.id) {
+        // Email changes are not supported — PATCH takes name, access and isActive only.
+        await updateSubAdmin(token, modal.id, { name, access: form.access, isActive: form.isActive });
+        toast("Sub admin updated — their existing sessions were invalidated", "success");
+      } else {
+        const created = await createSubAdmin(token, { name, email, access: form.access, isActive: form.isActive });
+        toast(
+          created?.invitationSent === false
+            ? "Account created, but the invitation email failed — use Resend invitation"
+            : "Sub admin added and a setup link was emailed",
+          created?.invitationSent === false ? "info" : "success"
+        );
+      }
       setModal(null);
-      toast(`Sub admin ${modal.id ? "updated" : "added"}`, "success");
       load();
     } catch (e) {
       setFormError(e.message);
@@ -205,6 +211,7 @@ export default function SubAdminsPage() {
   };
 
   const toggleActive = async (item) => {
+    setBusyId(item.id);
     try {
       await updateSubAdmin(token, item.id, { isActive: !item.isActive });
       toast(item.isActive ? "Sub admin deactivated" : "Sub admin activated", "success");
@@ -212,6 +219,21 @@ export default function SubAdminsPage() {
     } catch (e) {
       setError(e.message);
       toast(e.message, "error");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const resendInvite = async (item) => {
+    setBusyId(item.id);
+    try {
+      await resendSubAdminInvitation(token, item.id);
+      toast("A fresh setup link was emailed", "success");
+      load();
+    } catch (e) {
+      toast(e.message, "error");
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -229,11 +251,20 @@ export default function SubAdminsPage() {
     }
   };
 
-  const accessLabel = (href) => ACCESS_OPTIONS.find((o) => o.value === href)?.label || href;
+  const items = result?.items || [];
+
+  if (!fullAdmin) {
+    return (
+      <>
+        <PageHeader title="Sub Admins" subtitle="Only full admins can manage staff accounts" />
+        <Empty text="You do not have access to sub-admin management." />
+      </>
+    );
+  }
 
   return (
     <>
-      <PageHeader title="Sub Admins" subtitle="Admin accounts with access scoped to specific pages">
+      <PageHeader title="Sub Admins" subtitle="Staff accounts scoped to specific backend permissions">
         <button className="btn-primary" onClick={openAdd}>
           + Add sub admin
         </button>
@@ -251,7 +282,8 @@ export default function SubAdminsPage() {
                 <tr>
                   <th className="th">Name</th>
                   <th className="th">Email</th>
-                  <th className="th">Access</th>
+                  <th className="th">Permissions</th>
+                  <th className="th">Password</th>
                   <th className="th">Status</th>
                   <th className="th text-right">Actions</th>
                 </tr>
@@ -259,13 +291,20 @@ export default function SubAdminsPage() {
               <tbody className="divide-y divide-slate-100">
                 {items.map((i) => (
                   <tr key={i.id} className="hover:bg-slate-50">
-                    <td className="td font-medium text-slate-800">{i.name}</td>
+                    <td className="td">
+                      <p className="font-medium text-slate-800">{i.name}</p>
+                      {i.createdAt && <p className="text-xs text-slate-400">Added {fmtDate(i.createdAt)}</p>}
+                    </td>
                     <td className="td text-slate-600">{i.email}</td>
                     <td className="td">
                       <div className="flex max-w-xs flex-wrap gap-1">
                         {(i.access || []).slice(0, 3).map((a) => (
-                          <span key={a} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                            {accessLabel(a)}
+                          <span
+                            key={a}
+                            title={PERMISSION_LABELS[a] || a}
+                            className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600"
+                          >
+                            {a}
                           </span>
                         ))}
                         {(i.access || []).length > 3 && (
@@ -273,7 +312,13 @@ export default function SubAdminsPage() {
                             +{i.access.length - 3} more
                           </span>
                         )}
+                        {(i.access || []).length === 0 && <span className="text-xs text-slate-400">None</span>}
                       </div>
+                    </td>
+                    <td className="td">
+                      {/* mustChangePassword means the setup link has not been used yet. */}
+                      <Badge status={i.mustChangePassword ? "pending" : "active"} />
+                      {i.mustChangePassword && <p className="mt-1 text-xs text-slate-400">Invitation pending</p>}
                     </td>
                     <td className="td">
                       <Badge status={i.isActive ? "active" : "suspended"} />
@@ -283,12 +328,31 @@ export default function SubAdminsPage() {
                         <IconButton label="Edit" onClick={() => openEdit(i)}>
                           <EditIcon />
                         </IconButton>
+                        {i.mustChangePassword && (
+                          <IconButton
+                            label="Resend invitation"
+                            disabled={busyId === i.id}
+                            onClick={() => resendInvite(i)}
+                          >
+                            <MailIcon />
+                          </IconButton>
+                        )}
                         {i.isActive ? (
-                          <IconButton tone="danger" label="Deactivate" onClick={() => toggleActive(i)}>
+                          <IconButton
+                            tone="danger"
+                            label="Deactivate"
+                            disabled={busyId === i.id}
+                            onClick={() => toggleActive(i)}
+                          >
                             <BanIcon />
                           </IconButton>
                         ) : (
-                          <IconButton tone="success" label="Activate" onClick={() => toggleActive(i)}>
+                          <IconButton
+                            tone="success"
+                            label="Activate"
+                            disabled={busyId === i.id}
+                            onClick={() => toggleActive(i)}
+                          >
                             <CheckCircleIcon />
                           </IconButton>
                         )}
@@ -302,6 +366,15 @@ export default function SubAdminsPage() {
               </tbody>
             </table>
             {items.length === 0 && <Empty text="No sub admins yet" />}
+            {result?.totalPages > 1 && (
+              <Pagination
+                page={result.page}
+                totalPages={result.totalPages}
+                hasPreviousPage={result.hasPreviousPage}
+                hasNextPage={result.hasNextPage}
+                onChange={setPage}
+              />
+            )}
           </>
         )}
       </div>
@@ -330,37 +403,52 @@ export default function SubAdminsPage() {
               <input
                 type="text"
                 className="input"
+                maxLength={120}
                 autoFocus
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
             </Field>
-            <Field label="Email">
+            <Field
+              label="Email"
+              hint={modal.id ? "Email cannot be changed after the account is created" : "Must be unique across all accounts"}
+            >
               <input
                 type="email"
                 className="input"
                 value={form.email}
+                disabled={!!modal.id}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
               />
             </Field>
-            <Field label="Access" hint="Pages this sub admin is allowed to open">
-              <MultiSelect
-                options={ACCESS_OPTIONS}
+            <Field
+              label="Permissions"
+              hint="Changing permissions logs this sub admin out of existing sessions"
+            >
+              <AccessPicker
+                allowed={allowed}
                 selected={form.access}
                 onChange={(access) => setForm({ ...form, access })}
               />
             </Field>
-            <Field label="Active">
+            <label className="mb-1 flex items-center gap-2.5 text-sm text-slate-700">
               <input
                 type="checkbox"
                 className="h-4 w-4 accent-brand-400"
                 checked={form.isActive}
                 onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
               />
-            </Field>
+              Active
+            </label>
+            {!modal.id && (
+              <p className="mt-3 text-xs text-slate-400">
+                They receive a single-use setup link valid for 24 hours — no password is ever emailed. Sub admins can
+                never manage other sub admins.
+              </p>
+            )}
           </>
         )}
-        {formError && <p className="text-xs text-danger-ink">{formError}</p>}
+        {formError && <p className="mt-2 text-xs text-danger-ink">{formError}</p>}
       </Modal>
 
       <Modal
@@ -379,7 +467,8 @@ export default function SubAdminsPage() {
         }
       >
         <p className="text-sm text-slate-600">
-          Are you sure you want to delete <b>{deleteTarget?.name}</b>? This cannot be undone.
+          Delete <b>{deleteTarget?.name}</b>? This blocks their login, invalidates their tokens and removes any pending
+          invitation.
         </p>
       </Modal>
     </>

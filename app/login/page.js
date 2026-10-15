@@ -4,6 +4,13 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
+import { firstAllowedPage } from "@/lib/permissions";
+
+/** Sub-admins may not have dashboard access, and a pending invitation must set a password first. */
+function landingFor(admin) {
+  if (admin?.mustChangePassword) return "/change-password";
+  return firstAllowedPage(admin) || "/change-password";
+}
 
 export default function LoginPage() {
   const { login, admin, ready } = useStore();
@@ -14,7 +21,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (ready && admin) router.replace("/dashboard");
+    if (ready && admin) router.replace(landingFor(admin));
   }, [ready, admin, router]);
 
   const submit = async (e) => {
@@ -24,7 +31,7 @@ export default function LoginPage() {
     const res = await login(email.trim(), password);
     setLoading(false);
     if (!res.ok) return setError(res.error);
-    router.replace("/dashboard");
+    router.replace(landingFor(res.admin));
   };
 
   return (

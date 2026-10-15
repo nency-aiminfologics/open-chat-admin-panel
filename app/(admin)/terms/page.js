@@ -4,36 +4,37 @@ import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
 import { useToast } from "@/lib/toast";
 import { getTermsConditions, putTermsConditions } from "@/lib/api";
-import { ErrorBanner, Field, PageHeader, Spinner, fmtDateTime } from "@/components/ui";
+import { PERMISSIONS } from "@/lib/permissions";
+import { ErrorBanner, Modal, PageHeader, Spinner, Tabs, fmtDateTime } from "@/components/ui";
 
-const EMPTY = { title: "Terms & Conditions", contentHtml: "", version: "1.0", effectiveAt: "", isActive: true };
+const MAX_BODY = 100000;
 
 export default function TermsPage() {
-  const { token } = useStore();
+  const { token, can } = useStore();
   const toast = useToast();
-  const [terms, setTerms] = useState(null);
-  const [form, setForm] = useState(EMPTY);
+  const [data, setData] = useState(null);
+  const [body, setBody] = useState("");
+  const [view, setView] = useState("draft");
+  const [preview, setPreview] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [confirmPublish, setConfirmPublish] = useState(false);
   const [error, setError] = useState("");
-  const [preview, setPreview] = useState(false);
+  // Set when a publish ends in an unknown state — the fix is to re-read, never to blind-retry.
+  const [uncertain, setUncertain] = useState(false);
 
-  const load = () => {
+  const canPublish = can(PERMISSIONS.termsPublish);
+
+  const load = ({ keepBody = false } = {}) => {
     if (!token) return;
     setLoading(true);
     setError("");
     getTermsConditions(token)
-      .then((t) => {
-        setTerms(t);
-        if (t) {
-          setForm({
-            title: t.title || "",
-            contentHtml: t.contentHtml || "",
-            version: t.version || "",
-            effectiveAt: t.effectiveAt ? t.effectiveAt.slice(0, 10) : "",
-            isActive: !!t.isActive,
-          });
-        }
+      .then((d) => {
+        setData(d);
+        setUncertain(false);
+        if (!keepBody) setBody(d?.draft?.body ?? d?.published?.body ?? "");
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -41,23 +42,17 @@ export default function TermsPage() {
 
   useEffect(load, [token]);
 
-  const save = async () => {
-    if (!form.title.trim() || !form.contentHtml.trim() || !form.version.trim()) {
-      setError("Title, content and version are required");
+  const saveDraft = async () => {
+    if (!body.trim()) {
+      setError("The terms body is required.");
       return;
     }
     setSaving(true);
     setError("");
     try {
-      await putTermsConditions(token, {
-        title: form.title.trim(),
-        contentHtml: form.contentHtml,
-        version: form.version.trim(),
-        isActive: form.isActive,
-        ...(form.effectiveAt ? { effectiveAt: new Date(form.effectiveAt).toISOString() } : {}),
-      });
-      toast("Terms & conditions saved", "success");
-      load();
+      await putTermsConditions(token, { body, publish: false });
+      toast("Draft saved — no user is asked to accept again", "success");
+      load({ keepBody: true });
     } catch (e) {
       setError(e.message);
       toast(e.message, "error");
@@ -66,70 +61,164 @@ export default function TermsPage() {
     }
   };
 
-  if (loading) return <Spinner />;
+  const publish = async () => {
+    if (!body.trim()) {
+      setError("The terms body is required.");
+      return;
+    }
+    setPublishing(true);
+    setError("");
+    try {
+      const published = await putTermsConditions(token, { body, publish: true });
+      setConfirmPublish(false);
+      toast(`Published version ${published?.version ?? ""}`.trim(), "success");
+      load({ keepBody: true });
+    } catch (e) {
+      // Every publish creates a new version, so a retry after an uncertain result could double-publish.
+      setConfirmPublish(false);
+      setUncertain(true);
+      setError(e.message);
+      toast(e.message, "error");
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  if (loading && !data) return <Spinner />;
+
+  const draft = data?.draft;
+  const published = data?.published;
+  const shown = view === "published" ? published?.body || "" : body;
 
   return (
     <>
-      <PageHeader title="Terms & Conditions" subtitle="Single document shown at the public terms URL" />
-      <ErrorBanner error={error} onRetry={load} />
+      <PageHeader
+        title="Terms & Conditions"
+        subtitle="Drafts stay private; publishing creates a new version and asks users to accept again"
+      />
 
-      {terms && (
-        <p className="mb-4 text-xs text-slate-500">
-          Current version {terms.version} · updated {fmtDateTime(terms.updatedAt)} ·{" "}
-          <a href={terms.publicUrl} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">
-            public link
-          </a>
-        </p>
-      )}
+      <ErrorBanner error={error} onRetry={() => load({ keepBody: true })} />
 
-      <div className="card p-5">
-        <Field label="Title">
-          <input className="input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-        </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Version">
-            <input className="input" value={form.version} onChange={(e) => setForm({ ...form, version: e.target.value })} />
-          </Field>
-          <Field label="Effective date">
-            <input
-              type="date"
-              className="input"
-              value={form.effectiveAt}
-              onChange={(e) => setForm({ ...form, effectiveAt: e.target.value })}
-            />
-          </Field>
-        </div>
-        <Field label="Active">
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-brand-400"
-            checked={form.isActive}
-            onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
-          />
-        </Field>
-        <div className="mb-2 flex items-center justify-between">
-          <span className="block text-sm font-medium text-slate-700">Content (HTML)</span>
-          <button type="button" className="text-xs text-brand-600 hover:underline" onClick={() => setPreview((v) => !v)}>
-            {preview ? "Edit" : "Preview"}
+      {uncertain && (
+        <div className="mb-4 rounded-xl border border-warn/30 bg-warn-tint px-3.5 py-3 text-sm text-warn-ink">
+          <p className="font-medium">That publish did not confirm.</p>
+          <p className="mt-0.5">
+            Reload before trying again — a repeated publish creates another version even if the first one succeeded.
+          </p>
+          <button className="mt-2 font-medium underline" onClick={() => load({ keepBody: true })}>
+            Reload and check
           </button>
         </div>
-        {preview ? (
+      )}
+
+      <div className="mb-5 grid gap-4 sm:grid-cols-2">
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-slate-400">Published</p>
+          {published ? (
+            <p className="mt-1 text-sm text-slate-800">
+              Version {published.version} · {fmtDateTime(published.publishedAt)}
+            </p>
+          ) : (
+            <p className="mt-1 text-sm text-slate-500">Nothing published yet — the public endpoint returns 404.</p>
+          )}
+        </div>
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-slate-400">Draft</p>
+          <p className="mt-1 text-sm text-slate-800">
+            {draft ? `Saved ${fmtDateTime(draft.updatedAt || draft.createdAt)}` : "No draft saved"}
+          </p>
+        </div>
+      </div>
+
+      <Tabs
+        value={view}
+        onChange={setView}
+        tabs={[
+          { value: "draft", label: "Draft editor" },
+          { value: "published", label: "Published version" },
+        ]}
+      />
+
+      <div className="card p-5">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="block text-sm font-medium text-slate-700">
+            {view === "published" ? "Published body (read-only)" : "Body (text or HTML)"}
+          </span>
+          <div className="flex items-center gap-3">
+            {view === "published" && published && (
+              <button
+                type="button"
+                className="text-xs text-brand-600 hover:underline"
+                onClick={() => {
+                  setBody(published.body || "");
+                  setView("draft");
+                }}
+              >
+                Copy into draft
+              </button>
+            )}
+            <button type="button" className="text-xs text-brand-600 hover:underline" onClick={() => setPreview((v) => !v)}>
+              {preview ? "Edit" : "Preview"}
+            </button>
+          </div>
+        </div>
+
+        {preview || view === "published" ? (
+          /* The stored body may be HTML — rendered here only for the admin's own preview. */
           <div
-            className="mb-3 min-h-[200px] rounded-lg border border-slate-200 p-4 text-sm"
-            dangerouslySetInnerHTML={{ __html: form.contentHtml }}
+            className="mb-3 min-h-[220px] overflow-auto rounded-lg border border-slate-200 p-4 text-sm"
+            dangerouslySetInnerHTML={{ __html: shown }}
           />
         ) : (
           <textarea
-            rows={14}
-            className="input mb-3"
-            value={form.contentHtml}
-            onChange={(e) => setForm({ ...form, contentHtml: e.target.value })}
+            rows={16}
+            className="input mb-1"
+            maxLength={MAX_BODY}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Terms text or HTML…"
           />
         )}
-        <button className="btn-primary" disabled={saving} onClick={save}>
-          {saving ? "Saving…" : "Save terms"}
-        </button>
+
+        {/* {view === "draft" && !preview && (
+          <p className="mb-3 text-xs text-slate-400">
+            {body.length.toLocaleString()} / {MAX_BODY.toLocaleString()} characters
+          </p>
+        )} */}
+
+        {canPublish && view === "draft" && (
+          <div className="flex flex-wrap gap-2">
+            <button className="btn-secondary" disabled={saving || publishing} onClick={saveDraft}>
+              {saving ? "Saving…" : "Save draft"}
+            </button>
+            <button className="btn-primary" disabled={saving || publishing} onClick={() => setConfirmPublish(true)}>
+              Publish new version
+            </button>
+          </div>
+        )}
       </div>
+
+      <Modal
+        open={confirmPublish}
+        onClose={() => setConfirmPublish(false)}
+        title="Publish a new version"
+        footer={
+          <>
+            <button className="btn-secondary" onClick={() => setConfirmPublish(false)} disabled={publishing}>
+              Cancel
+            </button>
+            <button className="btn-primary" onClick={publish} disabled={publishing}>
+              {publishing ? "Publishing…" : "Publish"}
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-slate-600">
+          This stores an immutable version {published ? published.version + 1 : 1} and every user who accepted an
+          earlier version will be asked to accept again. Only publication increments the version — publishing twice
+          creates two versions, so press this once.
+        </p>
+      </Modal>
     </>
   );
 }

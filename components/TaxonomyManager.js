@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useToast } from "@/lib/toast";
-import { Badge, Empty, ErrorBanner, Field, Modal, PageHeader, Spinner } from "@/components/ui";
+import { Badge, Empty, ErrorBanner, Field, Modal, PageHeader, Pagination, Spinner } from "@/components/ui";
 
 const norm = (s) => String(s || "").trim().toLowerCase();
 
@@ -72,9 +72,10 @@ const TrashIcon = () => (
 );
 
 /** List + add/edit/delete/activate-deactivate manager for simple name-only taxonomy entities (skills, interests, ...). */
-export default function TaxonomyManager({ title, subtitle, noun, token, list, create, update, remove }) {
+export default function TaxonomyManager({ title, subtitle, noun, token, list, create, update, remove, canManage = true }) {
   const toast = useToast();
-  const [items, setItems] = useState([]);
+  const [page, setPage] = useState(1);
+  const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [modal, setModal] = useState(null); // { id?, name, isActive }
@@ -83,17 +84,19 @@ export default function TaxonomyManager({ title, subtitle, noun, token, list, cr
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
+  const items = result?.items || [];
+
   const load = () => {
     if (!token) return;
     setLoading(true);
     setError("");
-    list(token)
-      .then(setItems)
+    list(token, { page, limit: 20 })
+      .then((d) => setResult(Array.isArray(d) ? { items: d } : d))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [token]);
+  useEffect(load, [token, page]);
 
   const isDuplicate = (name, ignoreId) =>
     items.some((i) => i.id !== ignoreId && norm(i.name) === norm(name));
@@ -152,9 +155,11 @@ export default function TaxonomyManager({ title, subtitle, noun, token, list, cr
   return (
     <>
       <PageHeader title={title} subtitle={subtitle}>
-        <button className="btn-primary" onClick={() => setModal({ name: "", isActive: true })}>
-          + Add {noun.toLowerCase()}
-        </button>
+        {canManage && (
+          <button className="btn-primary" onClick={() => setModal({ name: "", isActive: true })}>
+            + Add {noun.toLowerCase()}
+          </button>
+        )}
       </PageHeader>
 
       <ErrorBanner error={error} onRetry={load} />
@@ -169,7 +174,7 @@ export default function TaxonomyManager({ title, subtitle, noun, token, list, cr
                 <tr>
                   <th className="th">Name</th>
                   <th className="th">Status</th>
-                  <th className="th text-right">Actions</th>
+                  {canManage && <th className="th text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -179,6 +184,7 @@ export default function TaxonomyManager({ title, subtitle, noun, token, list, cr
                     <td className="td">
                       <Badge status={i.isActive ? "active" : "suspended"} />
                     </td>
+                    {canManage && (
                     <td className="td text-right">
                       <div className="flex justify-end gap-2">
                         <IconButton label="Edit" onClick={() => setModal({ id: i.id, name: i.name, isActive: i.isActive })}>
@@ -198,11 +204,21 @@ export default function TaxonomyManager({ title, subtitle, noun, token, list, cr
                         </IconButton>
                       </div>
                     </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
             </table>
             {items.length === 0 && <Empty text={`No ${noun.toLowerCase()}s yet`} />}
+            {result && (
+              <Pagination
+                page={result.page}
+                totalPages={result.totalPages}
+                hasPreviousPage={result.hasPreviousPage}
+                hasNextPage={result.hasNextPage}
+                onChange={setPage}
+              />
+            )}
           </>
         )}
       </div>

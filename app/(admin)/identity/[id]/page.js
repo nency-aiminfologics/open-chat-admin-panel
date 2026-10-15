@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { useToast } from "@/lib/toast";
 import { getVerificationDetail, reviewGovDocument, reviewUserSkill, reviewVerification } from "@/lib/api";
+import { PERMISSIONS } from "@/lib/permissions";
 import { BackLink, Badge, ErrorBanner, PageHeader, Spinner, fmtDateTime } from "@/components/ui";
 
 function Info({ label, value }) {
@@ -109,15 +110,26 @@ function ReviewAction({ title, onSubmit, pending, options = ["approved", "reject
   );
 }
 
+/** Shown in place of the review controls to an admin who may read the queue but not decide. */
+function ReadOnlyNote() {
+  return (
+    <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">
+      You can view this submission but not review it — that needs the verification.review permission.
+    </p>
+  );
+}
+
 export default function VerificationDetail() {
   const { id } = useParams();
-  const { token } = useStore();
+  const { token, can } = useStore();
   const toast = useToast();
   const [submission, setSubmission] = useState(null);
   const [badge, setBadge] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const canReview = can(PERMISSIONS.verificationReview);
 
   const load = () => {
     if (!token || !id) return;
@@ -260,7 +272,7 @@ export default function VerificationDetail() {
         <section className="card p-5">
           <h2 className="mb-4 font-semibold">Government document</h2>
           <p className="mb-3 text-sm text-slate-500">Reviews the ID document on this submission.</p>
-          <ReviewAction pending={busy} onSubmit={govDocReview} />
+          {canReview ? <ReviewAction pending={busy} onSubmit={govDocReview} /> : <ReadOnlyNote />}
         </section>
 
         <section className="card p-5">
@@ -273,7 +285,11 @@ export default function VerificationDetail() {
                   {badgeSkillName(s.id) || s.name || s.id}
                   {s.category && <span className="ml-2 text-xs font-normal capitalize text-slate-400">{s.category}</span>}
                 </p>
-                <ReviewAction pending={busy} onSubmit={(status, reason) => skillReview(s.id, status, reason)} />
+                {canReview ? (
+                  <ReviewAction pending={busy} onSubmit={(status, reason) => skillReview(s.id, status, reason)} />
+                ) : (
+                  <ReadOnlyNote />
+                )}
               </div>
             ))}
           </div>
@@ -285,11 +301,15 @@ export default function VerificationDetail() {
             Approving verifies every skill below and the government document; rejecting applies the same reason to all of
             them. Use the individual reviews instead if decisions need to differ per skill or document.
           </p>
-          <ReviewAction
-            options={["approved", "rejected"]}
-            pending={busy}
-            onSubmit={(status, reason) => bulkReview(status === "approved" ? "approve" : "reject", reason)}
-          />
+          {canReview ? (
+            <ReviewAction
+              options={["approved", "rejected"]}
+              pending={busy}
+              onSubmit={(status, reason) => bulkReview(status === "approved" ? "approve" : "reject", reason)}
+            />
+          ) : (
+            <ReadOnlyNote />
+          )}
         </section>
 
         {badge && (

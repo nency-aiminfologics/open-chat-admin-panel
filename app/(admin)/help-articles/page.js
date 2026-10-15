@@ -1,6 +1,7 @@
 "use client";
 
 import { useStore } from "@/lib/store";
+import { PERMISSIONS } from "@/lib/permissions";
 import { createHelpArticle, listHelpArticles, updateHelpArticle } from "@/lib/api";
 import ContentManager from "@/components/ContentManager";
 
@@ -24,7 +25,7 @@ const FIELDS = [
 ];
 
 export default function HelpArticlesPage() {
-  const { token } = useStore();
+  const { token, can } = useStore();
   return (
     <ContentManager
       title="Help Articles"
@@ -36,6 +37,7 @@ export default function HelpArticlesPage() {
       update={updateHelpArticle}
       fields={FIELDS}
       titleKey="title"
+      canManage={can(PERMISSIONS.contentManage)}
       subtitleKey="content"
     />
   );

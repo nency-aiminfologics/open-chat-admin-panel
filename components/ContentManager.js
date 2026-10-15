@@ -15,7 +15,19 @@ function defaultsFromFields(fields) {
 }
 
 /** Generic list + add/edit CRUD manager for simple admin content types (no delete; hide via isActive). */
-export default function ContentManager({ title, subtitle, noun, token, list, create, update, fields, titleKey, subtitleKey }) {
+export default function ContentManager({
+  title,
+  subtitle,
+  noun,
+  token,
+  list,
+  create,
+  update,
+  fields,
+  titleKey,
+  subtitleKey,
+  canManage = true,
+}) {
   const toast = useToast();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -76,9 +88,11 @@ export default function ContentManager({ title, subtitle, noun, token, list, cre
   return (
     <>
       <PageHeader title={title} subtitle={subtitle}>
-        <button className="btn-primary" onClick={() => setModal({ ...defaultsFromFields(fields) })}>
-          + Add {noun.toLowerCase()}
-        </button>
+        {canManage && (
+          <button className="btn-primary" onClick={() => setModal({ ...defaultsFromFields(fields) })}>
+            + Add {noun.toLowerCase()}
+          </button>
+        )}
       </PageHeader>
 
       <ErrorBanner error={error} onRetry={load} />
@@ -95,7 +109,8 @@ export default function ContentManager({ title, subtitle, noun, token, list, cre
           {items.map((i) => (
             
             <div key={i.id} className="card p-5">
-               <div className="flex justify-end items-end mb-4 md:mb-0 shrink-0 gap-2">
+              {canManage && (
+                <div className="mb-4 flex shrink-0 items-end justify-end gap-2 md:mb-0">
                   <button className="btn-secondary !px-3 !py-1.5" onClick={() => setModal({ ...i })}>
                     Edit
                   </button>
@@ -103,6 +118,7 @@ export default function ContentManager({ title, subtitle, noun, token, list, cre
                     {i.isActive ? "Hide" : "Show"}
                   </button>
                 </div>
+              )}
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">

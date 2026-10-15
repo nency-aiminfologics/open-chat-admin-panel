@@ -5,7 +5,23 @@ import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { useToast } from "@/lib/toast";
 import { listUsers, updateUser } from "@/lib/api";
-import { Badge, Empty, ErrorBanner, Modal, PageHeader, Pagination, Spinner, UserCell, fmtDate } from "@/components/ui";
+import { PERMISSIONS } from "@/lib/permissions";
+import CountrySelect from "@/components/CountrySelect";
+import OnlineUsers from "@/components/OnlineUsers";
+import {
+  Badge,
+  CountChip,
+  Empty,
+  ErrorBanner,
+  Modal,
+  PageHeader,
+  Pagination,
+  PresenceBadge,
+  Spinner,
+  Tabs,
+  UserCell,
+  fmtDate,
+} from "@/components/ui";
 
 const ICON_TONE = {
   neutral: "border border-slate-200 bg-white text-slate-600 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700",
@@ -50,9 +66,11 @@ const CheckCircleIcon = () => (
 );
 
 export default function UsersPage() {
-  const { token } = useStore();
+  const { token, can } = useStore();
   const toast = useToast();
+  const [view, setView] = useState("all");
   const [q, setQ] = useState("");
+  const [search, setSearch] = useState("");
   const [country, setCountry] = useState("");
   const [isActive, setIsActive] = useState("");
   const [page, setPage] = useState(1);
@@ -61,6 +79,8 @@ export default function UsersPage() {
   const [error, setError] = useState("");
   const [confirm, setConfirm] = useState(null);
 
+  const canUpdate = can(PERMISSIONS.usersUpdate);
+
   const load = () => {
     if (!token) return;
     setLoading(true);
@@ -68,7 +88,7 @@ export default function UsersPage() {
     listUsers(token, {
       page,
       limit: 20,
-      search: q || undefined,
+      search: search || undefined,
       country: country || undefined,
       isActive: isActive || undefined,
     })
@@ -77,12 +97,13 @@ export default function UsersPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [token, page]);
+  // Filters reset the page before refetching, so a stale page never hides the new results.
+  useEffect(load, [token, page, search, country, isActive]);
 
-  const search = (e) => {
+  const submitSearch = (e) => {
     e.preventDefault();
     setPage(1);
-    load();
+    setSearch(q.trim());
   };
 
   const toggleActive = async (user) => {
@@ -103,90 +124,130 @@ export default function UsersPage() {
   return (
     <>
       <PageHeader title="Users" subtitle={result ? `${result.total} registered users` : "Registered users"} />
-      <ErrorBanner error={error} onRetry={load} />
 
-      <form onSubmit={search} className="mb-4 flex flex-wrap gap-3">
-        <input
-          className="input max-w-xs"
-          placeholder="Search name or email…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-        <input
-          className="input max-w-[180px]"
-          placeholder="Filter by country…"
-          value={country}
-          onChange={(e) => setCountry(e.target.value)}
-        />
-        <select className="input !w-auto" value={isActive} onChange={(e) => setIsActive(e.target.value)}>
-          <option value="">All accounts</option>
-          <option value="true">Active</option>
-          <option value="false">Deactivated</option>
-        </select>
-        <button type="submit" className="btn-primary">
-          Search
-        </button>
-      </form>
+      <Tabs
+        value={view}
+        onChange={setView}
+        tabs={[
+          { value: "all", label: "All users" },
+          { value: "online", label: "Online now" },
+        ]}
+      />
 
-      <div className="card overflow-x-auto">
-        {loading ? (
-          <Spinner />
-        ) : (
-          <>
-            <table className="w-full">
-              <thead className="border-b border-slate-200 bg-slate-50">
-                <tr>
-                  <th className="th">User</th>
-                  <th className="th">Country</th>
-                  <th className="th">Joined</th>
-                  <th className="th">Status</th>
-                  <th className="th text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {list.map((u) => (
-                  <tr key={u._id} className="hover:bg-slate-50">
-                    <td className="td">
-                      <UserCell userId={u._id} user={u} link={false} showStatus={false} />
-                    </td>
-                    <td className="td">{u.country || u.countryName || "—"}</td>
-                    <td className="td">{fmtDate(u.createdAt)}</td>
-                    <td className="td">
-                      <Badge status={u.isActive ? "active" : "suspended"} />
-                    </td>
-                    <td className="td">
-                      <div className="flex justify-end gap-2">
-                        <IconButton as={Link} href={`/users/${u._id}`} label="View">
-                          <EyeIcon />
-                        </IconButton>
-                        {u.isActive ? (
-                          <IconButton tone="danger" label="Suspend" onClick={() => setConfirm(u)}>
-                            <BanIcon />
-                          </IconButton>
-                        ) : (
-                          <IconButton tone="success" label="Activate" onClick={() => setConfirm(u)}>
-                            <CheckCircleIcon />
-                          </IconButton>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {list.length === 0 && <Empty text="No users found" />}
-            {result && (
-              <Pagination
-                page={result.page}
-                totalPages={result.totalPages}
-                hasPreviousPage={result.hasPreviousPage}
-                hasNextPage={result.hasNextPage}
-                onChange={setPage}
-              />
+      {view === "online" ? (
+        <OnlineUsers token={token} limit={20} />
+      ) : (
+        <>
+          <ErrorBanner error={error} onRetry={load} />
+
+          <form onSubmit={submitSearch} className="mb-4 flex flex-wrap gap-3">
+            <input
+              className="input max-w-xs"
+              placeholder="Search name or email…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+            <CountrySelect
+              token={token}
+              value={country}
+              onChange={(v) => {
+                setPage(1);
+                setCountry(v);
+              }}
+            />
+            <select
+              className="input !w-auto"
+              value={isActive}
+              onChange={(e) => {
+                setPage(1);
+                setIsActive(e.target.value);
+              }}
+            >
+              <option value="">All accounts</option>
+              <option value="true">Active</option>
+              <option value="false">Deactivated</option>
+            </select>
+            <button type="submit" className="btn-primary">
+              Search
+            </button>
+          </form>
+
+          <div className="card overflow-x-auto">
+            {loading ? (
+              <Spinner />
+            ) : (
+              <>
+                <table className="w-full">
+                  <thead className="border-b border-slate-200 bg-slate-50">
+                    <tr>
+                      <th className="th">User</th>
+                      {/* <th className="th">Presence</th> */}
+                      <th className="th">Country</th>
+                      <th className="th">Strikes</th>
+                      <th className="th">Joined</th>
+                      <th className="th">Status</th>
+                      <th className="th text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {list.map((u) => (
+                      <tr key={u._id} className="hover:bg-slate-50">
+                        <td className="td">
+                          <UserCell userId={u._id} user={u} link={false} showStatus={false} />
+                        </td>
+                        {/* <td className="td">
+                          <PresenceBadge online={u.isOnline} lastSeenAt={u.lastSeenAt} />
+                        </td> */}
+                        <td className="td">{u.countryName || u.country || "—"}</td>
+                        <td className="td">
+                          {u.strikeCount ? (
+                            <Link href={`/reports/${u._id}`} title="View reports and strikes">
+                              <CountChip value={u.strikeCount} tone={u.strikeCount > 1 ? "danger" : "warn"} />
+                            </Link>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
+                        <td className="td">{fmtDate(u.createdAt)}</td>
+                        <td className="td">
+                          <Badge status={u.isActive ? "active" : "suspended"} />
+                        </td>
+                        <td className="td">
+                          <div className="flex justify-end gap-2">
+                            <IconButton as={Link} href={`/users/${u._id}`} label="View">
+                              <EyeIcon />
+                            </IconButton>
+                            {canUpdate &&
+                              (u.isActive ? (
+                                <IconButton tone="danger" label="Suspend" onClick={() => setConfirm(u)}>
+                                  <BanIcon />
+                                </IconButton>
+                              ) : (
+                                <IconButton tone="success" label="Activate" onClick={() => setConfirm(u)}>
+                                  <CheckCircleIcon />
+                                </IconButton>
+                              ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {list.length === 0 && <Empty text="No users found" />}
+                {result && (
+                  <Pagination
+                    page={result.page}
+                    totalPages={result.totalPages}
+                    hasPreviousPage={result.hasPreviousPage}
+                    hasNextPage={result.hasNextPage}
+                    onChange={setPage}
+                  />
+                )}
+              </>
             )}
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      )}
 
       <Modal
         open={!!confirm}
@@ -205,7 +266,7 @@ export default function UsersPage() {
       >
         <p className="text-sm text-slate-600">
           {confirm?.isActive
-            ? `${confirm?.name || confirm?.email} will no longer be able to use the app until reactivated.`
+            ? `${confirm?.name || confirm?.email} will no longer be able to use the app until reactivated. Their tokens are invalidated and open sockets are disconnected.`
             : `${confirm?.name || confirm?.email} will regain access to their account.`}
         </p>
       </Modal>

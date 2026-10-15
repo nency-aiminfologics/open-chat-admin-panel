@@ -6,7 +6,20 @@ import { useParams } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { useToast } from "@/lib/toast";
 import { getUserDetail, updateUser } from "@/lib/api";
-import { BackLink, Badge, ErrorBanner, Modal, PageHeader, Spinner, fmtDate, fmtDateTime } from "@/components/ui";
+import { PERMISSIONS } from "@/lib/permissions";
+import {
+  BackLink,
+  Badge,
+  CountChip,
+  ErrorBanner,
+  Modal,
+  PageHeader,
+  PresenceBadge,
+  Spinner,
+  fmtDate,
+  fmtDateTime,
+  fmtRelative,
+} from "@/components/ui";
 
 const SOCIAL_ICON_PATHS = {
   facebook: "M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06c0 5 3.66 9.15 8.44 9.94v-7.03H7.9v-2.91h2.54V9.85c0-2.5 1.49-3.89 3.77-3.89 1.09 0 2.23.2 2.23.2v2.45h-1.26c-1.24 0-1.63.77-1.63 1.56v1.89h2.78l-.45 2.91h-2.33V22c4.78-.79 8.44-4.94 8.44-9.94Z",
@@ -40,6 +53,10 @@ const KNOWN_FIELDS = [
   "interestIds",
   "skillIds",
   "country",
+  "countryName",
+  "isOnline",
+  "lastSeenAt",
+  "strikeCount",
   "gender",
   "profession",
   "dateOfBirth",
@@ -57,7 +74,7 @@ function Info({ label, value }) {
 
 export default function UserDetail() {
   const { id } = useParams();
-  const { token } = useStore();
+  const { token, can } = useStore();
   const toast = useToast();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -65,6 +82,9 @@ export default function UserDetail() {
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
   const [role, setRole] = useState("");
   const [savingRole, setSavingRole] = useState(false);
+
+  const canUpdate = can(PERMISSIONS.usersUpdate);
+  const canSeeReports = can(PERMISSIONS.reportsRead);
 
   const load = () => {
     if (!token || !id) return;
@@ -142,16 +162,28 @@ export default function UserDetail() {
         }
         subtitle={user.position || user.email}
       >
+        <PresenceBadge online={user.isOnline} lastSeenAt={user.lastSeenAt} />
         <Badge status={user.isActive ? "active" : "suspended"} />
-        {user.isActive ? (
-          <button className="btn-danger" onClick={() => setConfirmDeactivate(true)}>
-            Suspend account
-          </button>
-        ) : (
-          <button className="btn-success" onClick={() => setActive(true)}>
-            Activate account
-          </button>
+        {canSeeReports && (user.strikeCount ?? 0) > 0 && (
+          <Link
+            href={`/reports/${user._id || id}`}
+            className="btn-secondary"
+            title="View the reports behind these strikes"
+          >
+            Strikes
+            <CountChip value={user.strikeCount} tone={user.strikeCount > 1 ? "danger" : "warn"} />
+          </Link>
         )}
+        {canUpdate &&
+          (user.isActive ? (
+            <button className="btn-danger" onClick={() => setConfirmDeactivate(true)}>
+              Suspend account
+            </button>
+          ) : (
+            <button className="btn-success" onClick={() => setActive(true)}>
+              Activate account
+            </button>
+          ))}
       </PageHeader>
 
       <ErrorBanner error={error} onRetry={load} />
@@ -164,7 +196,18 @@ export default function UserDetail() {
             <Info label="Phone" value={user.phone} />
             <Info label="Role" value={<span className="capitalize">{user.role}</span>} />
             <Info label="Joined" value={fmtDate(user.createdAt)} />
-            <Info label="Country" value={user.country} />
+            <Info label="Country" value={user.countryName || user.country} />
+            <Info
+              label="Presence"
+              value={
+                user.isOnline
+                  ? "Online now"
+                  : user.lastSeenAt
+                    ? `Last seen ${fmtRelative(user.lastSeenAt)}`
+                    : "Offline — never recorded"
+              }
+            />
+            <Info label="Strikes" value={String(user.strikeCount ?? 0)} />
             <Info label="Gender" value={<span className="capitalize">{user.gender}</span>} />
             <Info label="Profession" value={user.profession} />
             <Info label="Date of birth" value={fmtDate(user.dateOfBirth)} />
@@ -356,7 +399,8 @@ export default function UserDetail() {
         }
       >
         <p className="text-sm text-slate-600">
-          {user.name || user.email} will no longer be able to use the app until reactivated.
+          {user.name || user.email} will no longer be able to use the app until reactivated. Their tokens are
+          invalidated and open sockets are disconnected.
         </p>
       </Modal>
     </>

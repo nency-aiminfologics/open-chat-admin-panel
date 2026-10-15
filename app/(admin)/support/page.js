@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
+import { PERMISSIONS } from "@/lib/permissions";
 import { useToast } from "@/lib/toast";
 import { getTicketDetail, listTickets, replyTicket, setTicketStatus } from "@/lib/api";
 import { Badge, Empty, ErrorBanner, PageHeader, Pagination, Spinner, fmtDate, fmtDateTime } from "@/components/ui";
@@ -25,7 +26,8 @@ function initials(name, email) {
 }
 
 export default function SupportPage() {
-  const { token } = useStore();
+  const { token, can } = useStore();
+  const canReply = can(PERMISSIONS.supportReply);
   const toast = useToast();
   const [filter, setFilter] = useState("");
   const [page, setPage] = useState(1);
@@ -207,12 +209,12 @@ export default function SupportPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge status={ticket.ticket.status} />
-                  {ticket.ticket.status === "pending" && (
+                  {canReply && ticket.ticket.status === "pending" && (
                     <button className="btn-danger !px-3 !py-1.5" onClick={() => changeStatus("rejected")}>
                       Reject
                     </button>
                   )}
-                  {ticket.ticket.status === "rejected" && (
+                  {canReply && ticket.ticket.status === "rejected" && (
                     <button className="btn-secondary !px-3 !py-1.5" onClick={() => changeStatus("pending")}>
                       Reopen as pending
                     </button>
@@ -286,6 +288,7 @@ export default function SupportPage() {
                 <div ref={messagesEndRef} />
               </div>
 
+              {canReply ? (
               <div className="flex items-end gap-2 border-t border-slate-200 bg-white p-3">
                 <textarea
                   ref={textareaRef}
@@ -316,6 +319,11 @@ export default function SupportPage() {
                   )}
                 </button>
               </div>
+              ) : (
+                <p className="border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                  Replying needs the support.reply permission.
+                </p>
+              )}
             </div>
           )}
         </div>

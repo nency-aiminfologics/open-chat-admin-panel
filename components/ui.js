@@ -20,6 +20,13 @@ const BADGE = {
   suspended: "bg-danger-tint text-danger-ink ring-danger/30",
   rejected: "bg-danger-tint text-danger-ink ring-danger/30",
   dismissed: "bg-slate-100 text-slate-600 ring-slate-200",
+
+  queued: "bg-slate-100 text-slate-600 ring-slate-200",
+  processing: "bg-brand-100 text-brand-700 ring-brand-300",
+  sent: "bg-success-tint text-success-ink ring-success/30",
+  partial: "bg-warn-tint text-warn-ink ring-warn/30",
+  failed: "bg-danger-tint text-danger-ink ring-danger/30",
+  unknown: "bg-slate-100 text-slate-600 ring-slate-200",
   false: "bg-danger-tint text-danger-ink ring-danger/30",
   closed: "bg-slate-100 text-slate-600 ring-slate-200",
 };
@@ -29,8 +36,7 @@ export function Badge({ status }) {
     <span
       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium capitalize ring-1 ring-inset ${
         BADGE[status] || "bg-slate-100 text-slate-600 ring-slate-200"
-      }`}
-    >
+      }`}>
       <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
       {String(status).replace(/_/g, " ")}
     </span>
@@ -76,8 +82,7 @@ export function Modal({ open, onClose, title, children, footer }) {
           <h3 className="text-base font-semibold text-slate-900">{title}</h3>
           <button
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-          >
+            className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700">
             ×
           </button>
         </div>
@@ -234,5 +239,59 @@ export function Pagination({ page, totalPages, hasPreviousPage, hasNextPage, onC
         Next →
       </button>
     </div>
+  );
+}
+
+/** Live presence pill. `online` comes straight from the server's last observation. */
+export function PresenceBadge({ online, lastSeenAt }) {
+  if (online) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-success-tint px-2.5 py-1 text-xs font-medium text-success-ink ring-1 ring-inset ring-success/30">
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
+        </span>
+        Online
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500 ring-1 ring-inset ring-slate-200">
+      <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+      {lastSeenAt ? fmtRelative(lastSeenAt) : "Offline"}
+    </span>
+  );
+}
+
+/** Short "2h ago" style label — used for lastSeenAt, which is an observed offline time. */
+export function fmtRelative(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d)) return "—";
+  const secs = Math.round((Date.now() - d.getTime()) / 1000);
+  if (secs < 60) return "just now";
+  const mins = Math.round(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return fmtDate(iso);
+}
+
+/** Small count chip, e.g. a user's strike total. */
+export function CountChip({ value, tone = "neutral", title }) {
+  const tones = {
+    neutral: "bg-slate-100 text-slate-600 ring-slate-200",
+    warn: "bg-warn-tint text-warn-ink ring-warn/30",
+    danger: "bg-danger-tint text-danger-ink ring-danger/30",
+  };
+  return (
+    <span
+      title={title}
+      className={`inline-flex min-w-[1.75rem] items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${tones[tone]}`}
+    >
+      {value}
+    </span>
   );
 }
