@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
-import { listGroupedReports } from "@/lib/api";
+import { listGroupedReports, updateUser } from "@/lib/api";
+import { useToast } from "@/lib/toast";
 import { PERMISSIONS } from "@/lib/permissions";
 import StrikeDialog from "@/components/StrikeDialog";
 import {
@@ -24,6 +25,7 @@ const STATUSES = ["open", "reviewed", "dismissed"];
 const ICON_TONE = {
   neutral: "border border-slate-200 bg-white text-slate-600 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700",
   danger: "border border-danger/20 bg-white text-danger hover:bg-danger-tint",
+  success: "border border-success/30 bg-white text-success-ink hover:bg-success-tint",
 };
 
 function IconButton({ label, tone = "neutral", as: Comp = "button", ...props }) {
@@ -54,16 +56,25 @@ const GavelIcon = () => (
   </svg>
 );
 
+const CheckIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-[18px] w-[18px]">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75 9 17.25 19.5 6.75" />
+  </svg>
+);
+
 export default function ReportsPage() {
   const { token, can } = useStore();
+  const toast = useToast();
   const [status, setStatus] = useState("open");
   const [page, setPage] = useState(1);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [strikeTarget, setStrikeTarget] = useState(null);
+  const [activatingId, setActivatingId] = useState(null);
 
   const canModerate = can(PERMISSIONS.reportsModerate);
+  const canUpdateUsers = can(PERMISSIONS.usersUpdate);
 
   const load = () => {
     if (!token) return;
@@ -76,6 +87,19 @@ export default function ReportsPage() {
   };
 
   useEffect(load, [token, page, status]);
+
+  const activate = async (userId) => {
+    setActivatingId(userId);
+    try {
+      await updateUser(token, userId, { isActive: true });
+      toast("Account activated", "success");
+      load();
+    } catch (e) {
+      toast(e.message, "error");
+    } finally {
+      setActivatingId(null);
+    }
+  };
 
   const list = result?.items || [];
 
@@ -154,6 +178,16 @@ export default function ReportsPage() {
                             }
                           >
                             <GavelIcon />
+                          </IconButton>
+                        )}
+                        {canUpdateUsers && r.reportedUser?.isActive === false && (
+                          <IconButton
+                            tone="success"
+                            label="Activate account"
+                            disabled={activatingId === r.reportedUserId}
+                            onClick={() => activate(r.reportedUserId)}
+                          >
+                            <CheckIcon />
                           </IconButton>
                         )}
                       </div>
