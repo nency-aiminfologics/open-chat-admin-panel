@@ -57,7 +57,7 @@ function FacepileAvatar({ user, index }) {
         transition hover:scale-110 hover:!z-[70]`}
     >
       {user.avatarUrl ? (
-        <img src={user.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
+        <img src={user.avatarUrl} alt="" className="h-full w-full rounded-full object-cover border-2 border-[#AA8FFF]" />
       ) : (
         <span className="flex h-full w-full items-center justify-center rounded-full bg-brand-400 text-xs font-semibold text-white">
           {initials(user.name, user.email)}
@@ -172,8 +172,7 @@ export default function OnlineUsersWidget({ token, onCount }) {
 
         <Link
           href="/users"
-          className="flex items-center gap-1.5 rounded-full bg-success-tint py-1.5 pl-2.5 pr-2 text-sm font-medium text-success-ink transition hover:brightness-95"
-        >
+          className="flex items-center gap-1.5 rounded-full bg-success-tint py-1.5 pl-2.5 pr-2 text-sm font-medium text-success-ink transition hover:brightness-95">
           {!unavailable && (
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />

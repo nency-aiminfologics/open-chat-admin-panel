@@ -18,48 +18,56 @@ function Info({ label, value }) {
   );
 }
 
-function FileLinks({ label, urls }) {
-  const list = Array.isArray(urls) ? urls : urls ? [urls] : [];
+function FileButtons({ label, items, prefix = "File" }) {
+  const list = Array.isArray(items) ? items : [];
   if (list.length === 0) return <Info label={label} value="None" />;
   return (
     <div>
       <p className="mb-1 text-xs uppercase tracking-wide text-slate-400">{label}</p>
       <div className="flex flex-wrap gap-2">
-        {list.map((u, i) => (
-          <a
-            key={i}
-            href={u}
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-brand-600 hover:bg-brand-50"
-          >
-            📄 File {i + 1}
-          </a>
-        ))}
+        {list.map((item, idx) => {
+          const url = typeof item === "string" ? item : item?.url;
+          if (!url) return null;
+          return (
+            <a
+              key={idx}
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-brand-600 shadow-sm transition hover:bg-brand-50 hover:border-brand-200"
+            >
+              📄 {prefix} {idx + 1}
+            </a>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function LinkList({ label, urls }) {
-  const list = Array.isArray(urls) ? urls : urls ? [urls] : [];
+function LinkList({ label, items }) {
+  const list = Array.isArray(items) ? items : [];
   if (list.length === 0) return <Info label={label} value="None" />;
   return (
     <div>
       <p className="mb-1 text-xs uppercase tracking-wide text-slate-400">{label}</p>
-      <div className="flex flex-col gap-1">
-        {list.map((u, i) => (
-          <a
-            key={i}
-            href={u}
-            target="_blank"
-            rel="noreferrer"
-            className="truncate text-sm text-brand-600 hover:underline"
-            title={u}
-          >
-            🔗 {u}
-          </a>
-        ))}
+      <div className="flex flex-col gap-1.5">
+        {list.map((item, idx) => {
+          const url = typeof item === "string" ? item : item?.url;
+          if (!url) return null;
+          return (
+            <a
+              key={idx}
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="truncate text-sm text-brand-600 hover:underline inline-flex items-center gap-1.5"
+              title={url}
+            >
+              🔗 <span className="truncate">{url}</span>
+            </a>
+          );
+        })}
       </div>
     </div>
   );
@@ -88,7 +96,7 @@ function ReviewAction({ title, onSubmit, pending, options = ["approved", "reject
         <select className="input !w-auto" value={status} onChange={(e) => setStatus(e.target.value)}>
           {options.map((o) => (
             <option key={o} value={o}>
-              {STATUS_LABELS[o]}
+              {STATUS_LABELS[o] || o}
             </option>
           ))}
         </select>
@@ -123,8 +131,7 @@ export default function VerificationDetail() {
   const { id } = useParams();
   const { token, can } = useStore();
   const toast = useToast();
-  const [submission, setSubmission] = useState(null);
-  const [badge, setBadge] = useState(null);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -136,7 +143,7 @@ export default function VerificationDetail() {
     setLoading(true);
     setError("");
     getVerificationDetail(token, id)
-      .then(setSubmission)
+      .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   };
@@ -147,7 +154,7 @@ export default function VerificationDetail() {
     setBusy(true);
     try {
       const updated = await reviewVerification(token, id, { decision, adminNotes });
-      setSubmission(updated);
+      setData(updated);
       toast(`Submission ${decision === "approve" ? "approved" : "rejected"}`, "success");
     } catch (e) {
       setError(e.message);
@@ -160,12 +167,13 @@ export default function VerificationDetail() {
   const govDocReview = async (status, rejectionReason) => {
     setBusy(true);
     try {
-      const result = await reviewGovDocument(token, id, {
+      const govDocSourceId = data?.governmentDocuments?.[0]?.sources?.[0]?.submissionId || id;
+      await reviewGovDocument(token, govDocSourceId, {
         status,
         ...(status === "rejected" ? { rejectionReason } : {}),
       });
-      setBadge(result);
       toast(`Government document ${status.replace("_", " ")}`, "success");
+      load();
     } catch (e) {
       setError(e.message);
       toast(e.message, "error");
@@ -177,12 +185,13 @@ export default function VerificationDetail() {
   const skillReview = async (skillId, status, rejectionReason) => {
     setBusy(true);
     try {
-      const result = await reviewUserSkill(token, submission.userId, skillId, {
+      const targetUserId = data?.userId || data?.user?.id;
+      await reviewUserSkill(token, targetUserId, skillId, {
         status,
         ...(status === "rejected" ? { rejectionReason } : {}),
       });
-      setBadge(result);
       toast(`Skill ${status.replace("_", " ")}`, "success");
+      load();
     } catch (e) {
       setError(e.message);
       toast(e.message, "error");
@@ -193,7 +202,7 @@ export default function VerificationDetail() {
 
   if (loading) return <Spinner />;
 
-  if (!submission)
+  if (!data)
     return (
       <div>
         <ErrorBanner error={error} onRetry={load} />
@@ -201,101 +210,160 @@ export default function VerificationDetail() {
       </div>
     );
 
-  const skillList =
-    submission.skills?.length > 0
-      ? submission.skills.map((s) => ({ id: s._id || s.id, name: s.name, category: s.category }))
-      : (submission.skillIds || []).map((s) => (typeof s === "string" ? { id: s } : { id: s._id || s.id, name: s.name }));
-  const badgeSkillName = (skillId) => badge?.skills?.find((s) => s.id === skillId)?.name;
-  const user = submission.user;
+  const user = data.user;
+  const skills = Array.isArray(data.skills) ? data.skills : (data.skillIds || []);
+  const govDocs = Array.isArray(data.governmentDocuments) ? data.governmentDocuments : [];
+  const primaryDoc = govDocs[0] || {};
+  
+  // Combine or extract certificates by kind
+  const allCertificates = Array.isArray(data.certificates) ? data.certificates : [];
+  const certificateFiles = allCertificates.length > 0
+    ? allCertificates.filter((c) => c.kind !== "link")
+    : (data.certificateFileUrls || []);
+  const certificateLinks = allCertificates.length > 0
+    ? allCertificates.filter((c) => c.kind === "link")
+    : (data.certificateLinks || []);
+
+  // Verification images and videos
+  const imageFiles = Array.isArray(data.images) ? data.images : [];
+  const videoFiles = Array.isArray(data.videos) ? data.videos : (data.videoUrl ? [{ url: data.videoUrl }] : []);
+
+  // Primary review target info if available
+  const currentTarget = data.review?.targets?.find((t) => t.submissionId === id) || data.review?.targets?.[0];
+  const overallStatus = currentTarget?.status || data.status || "submitted";
 
   return (
     <>
       <BackLink href="/identity" label="Back to queue" />
-      <PageHeader title="Verification submission" >
-        <Badge status={submission.status} />
+      <PageHeader title="Verification submission">
+        <Badge status={overallStatus} />
       </PageHeader>
 
       <ErrorBanner error={error} onRetry={load} />
 
       <div className="grid gap-6 lg:grid-cols-2">
+        {/* Submission Details Card */}
         <section className="card p-5">
           <h2 className="mb-4 font-semibold">Submission</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <Info
               label="User"
               value={
-                <Link href={`/users/${submission.userId}`} className="flex items-center gap-2 text-brand-600 hover:underline">
+                <Link
+                  href={`/users/${data.userId || user?.id}`}
+                  className="flex items-center gap-2 text-brand-600 hover:underline"
+                >
                   {user?.avatarUrl && (
                     <img src={user.avatarUrl} alt="" className="h-6 w-6 shrink-0 rounded-full object-cover" />
                   )}
                   <span>
-                    {user?.name || submission.userId}
+                    {user?.name || data.userId}
                     {user?.email && <span className="text-slate-400"> · {user.email}</span>}
                   </span>
                 </Link>
               }
             />
-            <Info label="Country" value={submission.country} />
-            <Info label="ID document type" value={submission.idDocumentType || submission.idDocumentTypeId} />
-            <Info label="Government document status" value={submission.governmentDocumentStatus} />
-            <Info label="Reviewed by" value={submission.reviewedByUser?.name || submission.reviewedByUser?.email} />
-            <Info label="Reviewed at" value={submission.reviewedAt ? fmtDateTime(submission.reviewedAt) : undefined} />
+            <Info label="Country" value={primaryDoc.country || data.country} />
+            <Info
+              label="ID document type"
+              value={primaryDoc.documentType || primaryDoc.documentTypeId || data.idDocumentType || data.idDocumentTypeId}
+            />
+            <Info
+              label="Government document status"
+              value={primaryDoc.status || data.governmentDocumentStatus}
+            />
+            <Info
+              label="Reviewed by"
+              value={currentTarget?.reviewedByUser?.name || currentTarget?.reviewedByUser?.email || data.reviewedByUser?.name || data.reviewedByUser?.email}
+            />
+            <Info
+              label="Reviewed at"
+              value={currentTarget?.reviewedAt ? fmtDateTime(currentTarget.reviewedAt) : (data.reviewedAt ? fmtDateTime(data.reviewedAt) : undefined)}
+            />
           </div>
-          {submission.adminNotes && (
+
+          {(currentTarget?.adminNotes || data.adminNotes) && (
             <div className="mt-4">
-              <Info label="Admin notes" value={submission.adminNotes} />
+              <Info label="Admin notes" value={currentTarget?.adminNotes || data.adminNotes} />
             </div>
           )}
-          {submission.governmentDocumentRejectionReason && (
+
+          {(primaryDoc.rejectionReason || data.governmentDocumentRejectionReason) && (
             <p className="mt-3 rounded-lg bg-danger-tint px-3 py-2 text-sm text-danger-ink">
-              <b>Rejection reason:</b> {submission.governmentDocumentRejectionReason}
+              <b>Rejection reason:</b> {primaryDoc.rejectionReason || data.governmentDocumentRejectionReason}
             </p>
           )}
         </section>
 
+        {/* Evidence Card */}
         <section className="card p-5">
           <h2 className="mb-4 font-semibold">Evidence</h2>
           <div className="space-y-4">
-            <FileLinks label="Government document" urls={submission.idDocumentImageUrl} />
-             <FileLinks label="Certificate files" urls={submission.certificateFileUrls} />
-            <LinkList label="Certificate links" urls={submission.certificateLinks} />
-            <FileLinks label="Verification images" urls={submission.images} />
-           
-            {/* {(submission.videoUrl || submission.videoUrls) && (
-              <FileLinks label="Legacy video(s)" urls={submission.videoUrl || submission.videoUrls} />
-            )} */}
+            <FileButtons
+              label="Government document"
+              items={govDocs.length > 0 ? govDocs : (data.idDocumentImageUrl ? [{ url: data.idDocumentImageUrl }] : [])}
+              prefix="File"
+            />
+            <FileButtons
+              label="Certificate files"
+              items={certificateFiles}
+              prefix="File"
+            />
+            <LinkList
+              label="Certificate links"
+              items={certificateLinks}
+            />
+            <FileButtons
+              label="Verification images"
+              items={imageFiles}
+              prefix="File"
+            />
+            {videoFiles.length > 0 && (
+              <FileButtons
+                label="Verification videos"
+                items={videoFiles}
+                prefix="Video"
+              />
+            )}
           </div>
         </section>
 
-      
-
+        {/* Government Document Review */}
         <section className="card p-5">
           <h2 className="mb-4 font-semibold">Government document</h2>
           <p className="mb-3 text-sm text-slate-500">Reviews the ID document on this submission.</p>
           {canReview ? <ReviewAction pending={busy} onSubmit={govDocReview} /> : <ReadOnlyNote />}
         </section>
 
+        {/* Skills Review */}
         <section className="card p-5">
-          <h2 className="mb-4 font-semibold">Skills ({skillList.length})</h2>
-          {skillList.length === 0 && <p className="text-sm text-slate-400">No skills submitted</p>}
+          <h2 className="mb-4 font-semibold">Skills ({skills.length})</h2>
+          {skills.length === 0 && <p className="text-sm text-slate-400">No skills submitted</p>}
           <div className="space-y-4">
-            {skillList.map((s) => (
-              <div key={s.id} className="rounded-lg border border-slate-200 p-3">
-                <p className="mb-2 text-sm font-medium text-slate-700">
-                  {badgeSkillName(s.id) || s.name || s.id}
-                  {s.category && <span className="ml-2 text-xs font-normal capitalize text-slate-400">{s.category}</span>}
-                </p>
-                {canReview ? (
-                  <ReviewAction pending={busy} onSubmit={(status, reason) => skillReview(s.id, status, reason)} />
-                ) : (
-                  <ReadOnlyNote />
-                )}
-              </div>
-            ))}
+            {skills.map((s) => {
+              const skillId = s.id || s._id;
+              return (
+                <div key={skillId} className="rounded-lg border border-slate-200 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-sm font-medium text-slate-700">
+                      {s.name || skillId}
+                      {s.category && <span className="ml-2 text-xs font-normal capitalize text-slate-400">{s.category}</span>}
+                    </p>
+                    {s.displayStatus && <Badge status={s.displayStatus} />}
+                  </div>
+                  {canReview ? (
+                    <ReviewAction pending={busy} onSubmit={(status, reason) => skillReview(skillId, status, reason)} />
+                  ) : (
+                    <ReadOnlyNote />
+                  )}
+                </div>
+              );
+            })}
           </div>
         </section>
 
-          <section className="card p-5 lg:col-span-2">
+        {/* Whole-submission decision */}
+        <section className="card p-5 lg:col-span-2">
           <h2 className="mb-1 font-semibold">Whole-submission decision</h2>
           <p className="mb-4 text-sm text-slate-500">
             Approving verifies every skill below and the government document; rejecting applies the same reason to all of
@@ -311,40 +379,9 @@ export default function VerificationDetail() {
             <ReadOnlyNote />
           )}
         </section>
-
-        {badge && (
-          <section className="card p-5 lg:col-span-2">
-            <h2 className="mb-4 font-semibold">
-              Current badge — {badge.badge?.earned ? "Earned" : "Not earned"} ({badge.badge?.govDocsVerified ?? 0} doc,{" "}
-              {badge.badge?.skillsVerified ?? 0} skills verified)
-            </h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <p className="mb-2 text-sm font-medium text-slate-700">Government documents</p>
-                <div className="space-y-2">
-                  {(badge.govDocuments || []).map((d) => (
-                    <div key={d.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
-                      <span>{d.documentType}</span>
-                      <Badge status={d.displayStatus} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p className="mb-2 text-sm font-medium text-slate-700">Skills</p>
-                <div className="space-y-2">
-                  {(badge.skills || []).map((s) => (
-                    <div key={s.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
-                      <span>{s.name}</span>
-                      <Badge status={s.displayStatus} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
       </div>
     </>
   );
 }
+
+

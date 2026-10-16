@@ -77,7 +77,7 @@ export function Donut({ data, size = 160, thickness = 22, centerLabel, centerVal
 }
 
 /**
- * Single-series area/line trend with a pointer-tracking crosshair + tooltip.
+ * Single-series bar trend with a pointer-tracking hover highlight + tooltip.
  * `data` is an ascending array of { date, count }.
  */
 export function TrendArea({ data, seriesLabel = "New users", height = 220 }) {
@@ -93,21 +93,20 @@ export function TrendArea({ data, seriesLabel = "New users", height = 220 }) {
   const maxV = Math.max(...data.map((d) => d.count), 1);
   const niceMax = Math.max(Math.ceil(maxV / 5) * 5, 5);
 
-  const x = (i) => padding.left + (i / (data.length - 1)) * innerW;
+  const bandWidth = innerW / data.length;
+  const barWidth = Math.min(bandWidth * 0.6, 36);
+  const xCenter = (i) => padding.left + i * bandWidth + bandWidth / 2;
   const y = (v) => padding.top + innerH - (v / niceMax) * innerH;
-
-  const linePath = data.map((d, i) => `${i === 0 ? "M" : "L"} ${x(i).toFixed(2)} ${y(d.count).toFixed(2)}`).join(" ");
-  const areaPath = `${linePath} L ${x(data.length - 1).toFixed(2)} ${(padding.top + innerH).toFixed(2)} L ${x(0).toFixed(2)} ${(padding.top + innerH).toFixed(2)} Z`;
+  const baseline = padding.top + innerH;
 
   const onMove = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const frac = (e.clientX - rect.left) / rect.width;
-    const idx = Math.round(frac * (data.length - 1));
+    const idx = Math.floor(frac * data.length);
     setHoverIdx(Math.min(Math.max(idx, 0), data.length - 1));
   };
 
   const ticks = [0, niceMax / 2, niceMax];
-  const last = data[data.length - 1];
   const hovered = hoverIdx != null ? data[hoverIdx] : null;
 
   return (
@@ -134,38 +133,24 @@ export function TrendArea({ data, seriesLabel = "New users", height = 220 }) {
             </text>
           </g>
         ))}
-        <path d={areaPath} fill="currentColor" opacity="0.1" stroke="none" />
-        <path d={linePath} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx={x(data.length - 1)} cy={y(last.count)} r="4" fill="currentColor" stroke="white" strokeWidth="2" />
-        {hoverIdx != null && (
-          <>
-            <line
-              x1={x(hoverIdx)}
-              x2={x(hoverIdx)}
-              y1={padding.top}
-              y2={padding.top + innerH}
-              stroke="currentColor"
-              strokeWidth="1"
-              className="text-slate-300"
-            />
-            <circle cx={x(hoverIdx)} cy={y(data[hoverIdx].count)} r="4" fill="currentColor" stroke="white" strokeWidth="2" />
-          </>
-        )}
+        {data.map((d, i) => (
+          <rect
+            key={d.date ?? i}
+            x={xCenter(i) - barWidth / 2}
+            y={y(d.count)}
+            width={barWidth}
+            height={Math.max(baseline - y(d.count), 0)}
+            rx={4}
+            fill="currentColor"
+            opacity={hoverIdx == null || hoverIdx === i ? 1 : 0.35}
+            className="transition-opacity duration-150"
+          />
+        ))}
       </svg>
-      <span
-        className="pointer-events-none absolute whitespace-nowrap text-xs font-medium tabular-nums text-slate-700"
-        style={{
-          left: `${(x(data.length - 1) / W) * 100}%`,
-          top: `${(y(last.count) / H) * 100}%`,
-          transform: "translate(-110%, -130%)",
-        }}
-      >
-        {last.count}
-      </span>
       {hovered && (
         <div
           className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs text-white shadow-lg"
-          style={{ left: `${(x(hoverIdx) / W) * 100}%`, top: `${(y(hovered.count) / H) * 100}%` }}
+          style={{ left: `${(xCenter(hoverIdx) / W) * 100}%`, top: `${(y(hovered.count) / H) * 100}%` }}
         >
           <p className="font-semibold tabular-nums">
             {hovered.count} <span className="font-normal text-white/60">{seriesLabel.toLowerCase()}</span>

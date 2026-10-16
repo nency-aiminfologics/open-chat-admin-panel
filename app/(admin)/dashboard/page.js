@@ -6,7 +6,7 @@ import { useStore } from "@/lib/store";
 import { getDashboard } from "@/lib/api";
 import { PERMISSIONS } from "@/lib/permissions";
 import { Empty, ErrorBanner, PageHeader, Spinner } from "@/components/ui";
-import { Donut, TrendArea } from "@/components/Charts";
+import { Donut } from "@/components/Charts";
 import OnlineUsersWidget from "@/components/OnlineUsersWidget";
 
 /** Modest polling for the counters — presence is live, but per-second polling is not wanted. */
@@ -48,59 +48,56 @@ export default function Dashboard() {
 
   const cards = data
     ? [
-        {
-          label: "Total users",
-          value: data.users?.total ?? 0,
-          href: "/users",
-          tone: "bg-brand-50 text-brand-700",
-          perm: PERMISSIONS.usersRead,
-        },
-        {
-          label: "Active users",
-          value: data.users?.active ?? 0,
-          href: "/users",
-          tone: "bg-success-tint text-success-ink",
-          perm: PERMISSIONS.usersRead,
-        },
-        {
-          label: "Online now",
-          // Presence can be unavailable; an em dash is honest where a zero would mislead.
-          value: onlineCount ?? "—",
-          href: "/users",
-          tone: "bg-success-tint text-success-ink",
-          live: true,
-          perm: PERMISSIONS.usersRead,
-        },
-        {
-          label: "Verifications pending review",
-          value: data.verificationsPendingReview ?? 0,
-          href: "/identity",
-          tone: "bg-warn-tint text-warn-ink",
-          perm: PERMISSIONS.verificationRead,
-        },
-        {
-          label: "Open reports",
-          value: data.reportsOpen ?? 0,
-          href: "/reports",
-          tone: "bg-danger-tint text-danger-ink",
-          perm: PERMISSIONS.reportsRead,
-        },
-        {
-          label: "Open tickets",
-          value: data.ticketsOpen ?? 0,
-          href: "/support",
-          tone: "bg-brand-100 text-brand-700",
-          perm: PERMISSIONS.supportRead,
-        },
-      ].filter((c) => can(c.perm))
+      {
+        label: "Total users",
+        value: data.users?.total ?? 0,
+        href: "/users",
+        tone: "bg-brand-50 text-brand-700",
+        perm: PERMISSIONS.usersRead,
+      },
+      {
+        label: "Active users",
+        value: data.users?.active ?? 0,
+        href: "/users",
+        tone: "bg-success-tint text-success-ink",
+        perm: PERMISSIONS.usersRead,
+      },
+      {
+        label: "Online now",
+        // Presence can be unavailable; an em dash is honest where a zero would mislead.
+        value: onlineCount ?? "—",
+        href: "/users",
+        tone: "bg-success-tint text-success-ink",
+        live: true,
+        perm: PERMISSIONS.usersRead,
+      },
+      {
+        label: "Verifications pending review",
+        value: data.verificationsPendingReview ?? 0,
+        href: "/identity",
+        tone: "bg-warn-tint text-warn-ink",
+        perm: PERMISSIONS.verificationRead,
+      },
+      {
+        label: "Open reports",
+        value: data.reportsOpen ?? 0,
+        href: "/reports",
+        tone: "bg-danger-tint text-danger-ink",
+        perm: PERMISSIONS.reportsRead,
+      },
+      {
+        label: "Open tickets",
+        value: data.ticketsOpen ?? 0,
+        href: "/support",
+        tone: "bg-brand-100 text-brand-700",
+        perm: PERMISSIONS.supportRead,
+      },
+    ].filter((c) => can(c.perm))
     : [];
 
   const total = data?.users?.total ?? 0;
   const active = data?.users?.active ?? 0;
   const inactive = Math.max(total - active, 0);
-  const growth = Array.isArray(data?.users?.growth)
-    ? [...data.users.growth].sort((a, b) => new Date(a.date) - new Date(b.date))
-    : [];
 
   return (
     <>
@@ -126,14 +123,9 @@ export default function Dashboard() {
               </Link>
             ))}
           </div>
-
-          {canSeeUsers && (
-            <div className="mt-6">
-              <OnlineUsersWidget token={token} onCount={setLiveOnline} />
-            </div>
-          )}
-
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
+            {canSeeUsers && <OnlineUsersWidget token={token} onCount={setLiveOnline} />}
+
             <div className="card p-5">
               <h2 className="mb-4 font-semibold text-slate-800">Users by status</h2>
               {total > 0 ? (
@@ -147,15 +139,6 @@ export default function Dashboard() {
                 />
               ) : (
                 <Empty text="No users yet" />
-              )}
-            </div>
-
-            <div className="card p-5">
-              <h2 className="mb-4 font-semibold text-slate-800">New users over time</h2>
-              {growth.length >= 2 ? (
-                <TrendArea data={growth} seriesLabel="New users" />
-              ) : (
-                <Empty text="Not enough signup history to chart yet" />
               )}
             </div>
           </div>
