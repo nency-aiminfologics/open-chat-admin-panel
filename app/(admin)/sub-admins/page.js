@@ -174,6 +174,13 @@ export default function SubAdminsPage() {
     setModal(item);
   };
 
+  const [conflictSubAdmin, setConflictSubAdmin] = useState(null);
+  const [expandedPermissions, setExpandedPermissions] = useState({});
+
+  const togglePermissions = (id) => {
+    setExpandedPermissions((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
   const save = async () => {
     const name = form.name.trim();
     const email = form.email.trim();
@@ -186,6 +193,7 @@ export default function SubAdminsPage() {
       return;
     }
     setFormError("");
+    setConflictSubAdmin(null);
     setSaving(true);
     try {
       if (modal.id) {
@@ -204,7 +212,32 @@ export default function SubAdminsPage() {
       setModal(null);
       load();
     } catch (e) {
-      setFormError(e.message);
+      const msg = e.message || "Failed to save sub admin";
+      if (!modal.id && /email is already in use/i.test(msg)) {
+        try {
+          // Check if an existing sub-admin already has this email
+          const subAdminsData = await listSubAdmins(token, { page: 1, limit: 100 });
+          const list = Array.isArray(subAdminsData) ? subAdminsData : subAdminsData?.items || [];
+          const existing = list.find((s) => s.email?.toLowerCase() === email.toLowerCase());
+
+          if (existing) {
+            setConflictSubAdmin(existing);
+            setFormError(
+              existing.mustChangePassword
+                ? `An account already exists for this email with a pending setup invitation. You can resend the invitation or edit their permissions.`
+                : `A sub-admin account already exists with this email (${existing.name}). You can edit this existing sub-admin instead.`
+            );
+          } else {
+            setFormError(
+              "An account already exists with this email (regular user or admin). Please use a different email address — sub-admin accounts cannot overwrite existing user roles."
+            );
+          }
+        } catch {
+          setFormError(msg);
+        }
+      } else {
+        setFormError(msg);
+      }
     } finally {
       setSaving(false);
     }
@@ -297,8 +330,11 @@ export default function SubAdminsPage() {
                     </td>
                     <td className="td text-slate-600">{i.email}</td>
                     <td className="td">
-                      <div className="flex max-w-xs flex-wrap gap-1">
-                        {(i.access || []).slice(0, 3).map((a) => (
+                      <div className="flex max-w-sm flex-wrap gap-1">
+                        {((expandedPermissions[i.id] || (i.access || []).length <= 3)
+                          ? (i.access || [])
+                          : (i.access || []).slice(0, 3)
+                        ).map((a) => (
                           <span
                             key={a}
                             title={PERMISSION_LABELS[a] || a}
@@ -308,9 +344,13 @@ export default function SubAdminsPage() {
                           </span>
                         ))}
                         {(i.access || []).length > 3 && (
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
-                            +{i.access.length - 3} more
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => togglePermissions(i.id)}
+                            className="rounded-full bg-brand-50 border border-brand-200 px-2 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100 transition cursor-pointer"
+                          >
+                            {expandedPermissions[i.id] ? "Show less" : `+${i.access.length - 3} more`}
+                          </button>
                         )}
                         {(i.access || []).length === 0 && <span className="text-xs text-slate-400">None</span>}
                       </div>
@@ -318,7 +358,7 @@ export default function SubAdminsPage() {
                     <td className="td">
                       {/* mustChangePassword means the setup link has not been used yet. */}
                       <Badge status={i.mustChangePassword ? "pending" : "active"} />
-                      {i.mustChangePassword && <p className="mt-1 text-xs text-slate-400">Invitation pending</p>}
+                      {/* {i.mustChangePassword && <p className="mt-1 text-xs text-slate-400">Invitation pending</p>} */}
                     </td>
                     <td className="td">
                       <Badge status={i.isActive ? "active" : "suspended"} />
@@ -448,7 +488,39 @@ export default function SubAdminsPage() {
             )}
           </>
         )}
-        {formError && <p className="mt-2 text-xs text-danger-ink">{formError}</p>}
+        {formError && (
+          <div className="mt-3 rounded-lg bg-danger-tint p-3 text-xs text-danger-ink">
+            <p className="font-medium">{formError}</p>
+            {conflictSubAdmin && (
+              <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="rounded-md bg-white px-2.5 py-1 text-xs font-semibold text-slate-800 shadow-sm border border-slate-200 hover:bg-slate-50 transition"
+                  onClick={() => {
+                    openEdit(conflictSubAdmin);
+                    setConflictSubAdmin(null);
+                  }}
+                >
+                  Edit existing sub-admin ({conflictSubAdmin.name})
+                </button>
+                {conflictSubAdmin.mustChangePassword && (
+                  <button
+                    type="button"
+                    disabled={busyId === conflictSubAdmin.id}
+                    className="rounded-md bg-brand-500 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-brand-600 transition disabled:opacity-50"
+                    onClick={async () => {
+                      await resendInvite(conflictSubAdmin);
+                      setModal(null);
+                      setConflictSubAdmin(null);
+                    }}
+                  >
+                    Resend invitation
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
 
       <Modal
