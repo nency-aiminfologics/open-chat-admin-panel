@@ -12,7 +12,7 @@ import {
   updateSubAdmin,
 } from "@/lib/api";
 import { PERMISSION_GROUPS, PERMISSION_LABELS } from "@/lib/permissions";
-import { Badge, Empty, ErrorBanner, Field, Modal, PageHeader, Pagination, Spinner, fmtDate } from "@/components/ui";
+import { Badge, ButtonSpinner, Empty, ErrorBanner, Field, Modal, PageHeader, Pagination, Spinner, fmtDate } from "@/components/ui";
 
 const EMPTY_FORM = { name: "", email: "", access: [], isActive: true };
 
@@ -431,8 +431,9 @@ export default function SubAdminsPage() {
             <button className="btn-secondary" onClick={() => setModal(null)}>
               Cancel
             </button>
-            <button className="btn-primary" disabled={saving} onClick={save}>
-              {saving ? "Saving…" : "Save"}
+            <button className="btn-primary flex items-center justify-center gap-1.5" disabled={saving} onClick={save}>
+              {saving && <ButtonSpinner />}
+              Save
             </button>
           </>
         }
@@ -532,8 +533,9 @@ export default function SubAdminsPage() {
             <button className="btn-secondary" onClick={() => setDeleteTarget(null)}>
               Cancel
             </button>
-            <button className="btn-danger" disabled={deleting} onClick={confirmDelete}>
-              {deleting ? "Deleting…" : "Delete"}
+            <button className="btn-danger flex items-center justify-center gap-1.5" disabled={deleting} onClick={confirmDelete}>
+              {deleting && <ButtonSpinner className="h-4 w-4 border-white border-t-transparent" />}
+              Delete
             </button>
           </>
         }

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ApiError, listOnlineUsers } from "@/lib/api";
 import CountrySelect from "@/components/CountrySelect";
-import { Empty, Pagination, PresenceBadge, Spinner, UserCell } from "@/components/ui";
+import { ButtonSpinner, Empty, Pagination, PresenceBadge, Spinner, UserCell } from "@/components/ui";
 
 /**
  * Presence comes from the Socket.IO/Redis cluster and is a live observation — modest polling
@@ -83,7 +83,9 @@ export default function OnlineUsers({ token, limit = 10, onCount }) {
     setQuery(search.trim());
   };
 
-  const list = result?.items || [];
+  const list = (result?.items || []).filter(
+    (u) => (u.role ? u.role === "user" : true) && u.role !== "sub-admin" && u.role !== "admin"
+  );
 
   return (
     <div className="card">
@@ -112,10 +114,11 @@ export default function OnlineUsers({ token, limit = 10, onCount }) {
           <button
             type="button"
             onClick={() => load({ silent: true })}
-            className="btn-secondary !px-3 !py-1.5 !text-xs"
+            className="btn-secondary flex items-center justify-center gap-1.5 !px-3 !py-1.5 !text-xs"
             disabled={refreshing}
           >
-            {refreshing ? "Refreshing…" : "Refresh"}
+            {refreshing && <ButtonSpinner className="h-3 w-3" />}
+            Refresh
           </button>
         </div>
       </div>

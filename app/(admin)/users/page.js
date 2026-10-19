@@ -83,11 +83,18 @@ export default function UsersPage() {
 
   const load = () => {
     if (!token) return;
+    if (view === "online") return;
     setLoading(true);
     setError("");
+
+    // isDeleted=false for normal users tab, isDeleted=true for deleted tab
+    const isDeletedParam = view === "deleted" ? true : false;
+
     listUsers(token, {
       page,
       limit: 20,
+      role: "user",
+      isDeleted: isDeletedParam,
       search: search || undefined,
       country: country || undefined,
       isActive: isActive || undefined,
@@ -98,7 +105,12 @@ export default function UsersPage() {
   };
 
   // Filters reset the page before refetching, so a stale page never hides the new results.
-  useEffect(load, [token, page, search, country, isActive]);
+  useEffect(load, [token, page, search, country, isActive, view]);
+
+  const handleTabChange = (nextTab) => {
+    setView(nextTab);
+    setPage(1);
+  };
 
   const submitSearch = (e) => {
     e.preventDefault();
@@ -119,17 +131,31 @@ export default function UsersPage() {
     }
   };
 
-  const list = result?.items || [];
+  const list = (result?.items || []).filter(
+    (u) => (u.role ? u.role === "user" : true) && u.role !== "sub-admin" && u.role !== "admin"
+  );
+
+  const isDeletedTab = view === "deleted";
 
   return (
     <>
-      <PageHeader title="Users" subtitle={result ? `${result.total} registered users` : "Registered users"} />
+      <PageHeader
+        title="Users"
+        subtitle={
+          result
+            ? `${result.total} ${isDeletedTab ? "deleted" : "registered"} users`
+            : isDeletedTab
+              ? "Deleted users"
+              : "Registered users"
+        }
+      />
 
       <Tabs
         value={view}
-        onChange={setView}
+        onChange={handleTabChange}
         tabs={[
           { value: "all", label: "All users" },
+          { value: "deleted", label: "Deleted users" },
           { value: "online", label: "Online now" },
         ]}
       />
@@ -155,18 +181,20 @@ export default function UsersPage() {
                 setCountry(v);
               }}
             />
-            <select
-              className="input !w-auto"
-              value={isActive}
-              onChange={(e) => {
-                setPage(1);
-                setIsActive(e.target.value);
-              }}
-            >
-              <option value="">All accounts</option>
-              <option value="true">Active</option>
-              <option value="false">Deactivated</option>
-            </select>
+            {!isDeletedTab && (
+              <select
+                className="input !w-auto"
+                value={isActive}
+                onChange={(e) => {
+                  setPage(1);
+                  setIsActive(e.target.value);
+                }}
+              >
+                <option value="">All accounts</option>
+                <option value="true">Active</option>
+                <option value="false">Deactivated</option>
+              </select>
+            )}
             <button type="submit" className="btn-primary">
               Search
             </button>
@@ -184,56 +212,63 @@ export default function UsersPage() {
                       {/* <th className="th">Presence</th> */}
                       <th className="th">Country</th>
                       <th className="th">Strikes</th>
-                      <th className="th">Joined</th>
+                      <th className="th">{isDeletedTab ? "Registered" : "Joined"}</th>
                       <th className="th">Status</th>
                       <th className="th text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {list.map((u) => (
-                      <tr key={u._id} className="hover:bg-slate-50">
-                        <td className="td">
-                          <UserCell userId={u._id} user={u} link={false} showStatus={false} />
-                        </td>
-                        {/* <td className="td">
-                          <PresenceBadge online={u.isOnline} lastSeenAt={u.lastSeenAt} />
-                        </td> */}
-                        <td className="td">{u.countryName || u.country || "—"}</td>
-                        <td className="td">
-                          {u.strikeCount ? (
-                            <Link href={`/reports/${u._id}`} title="View reports and strikes">
-                              <CountChip value={u.strikeCount} tone={u.strikeCount > 1 ? "danger" : "warn"} />
-                            </Link>
-                          ) : (
-                            <span className="text-slate-400">—</span>
-                          )}
-                        </td>
-                        <td className="td">{fmtDate(u.createdAt)}</td>
-                        <td className="td">
-                          <Badge status={u.isActive ? "active" : "suspended"} />
-                        </td>
-                        <td className="td">
-                          <div className="flex justify-end gap-2">
-                            <IconButton as={Link} href={`/users/${u._id}`} label="View">
-                              <EyeIcon />
-                            </IconButton>
-                            {canUpdate &&
-                              (u.isActive ? (
-                                <IconButton tone="danger" label="Suspend" onClick={() => setConfirm(u)}>
-                                  <BanIcon />
-                                </IconButton>
-                              ) : (
-                                <IconButton tone="success" label="Activate" onClick={() => setConfirm(u)}>
-                                  <CheckCircleIcon />
-                                </IconButton>
-                              ))}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {list.map((u) => {
+                      const isDeletedUser = u.accountStatus === "deleted" || u.isDeleted === true;
+                      const status = isDeletedUser ? "deleted" : u.isActive ? "active" : "suspended";
+                      const countryDisplay = u.countryName || u.country || (isDeletedUser ? "Unavailable" : "—");
+
+                      return (
+                        <tr key={u._id || u.id} className="hover:bg-slate-50">
+                          <td className="td">
+                            <UserCell userId={u._id || u.id} user={u} link={false} showStatus={false} />
+                          </td>
+                          {/* <td className="td">
+                            <PresenceBadge online={u.isOnline} lastSeenAt={u.lastSeenAt} />
+                          </td> */}
+                          <td className="td">{countryDisplay}</td>
+                          <td className="td">
+                            {u.strikeCount ? (
+                              <Link href={`/reports/${u._id || u.id}`} title="View reports and strikes">
+                                <CountChip value={u.strikeCount} tone={u.strikeCount > 1 ? "danger" : "warn"} />
+                              </Link>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+                          <td className="td">{fmtDate(u.createdAt)}</td>
+                          <td className="td">
+                            <Badge status={status} />
+                          </td>
+                          <td className="td">
+                            <div className="flex justify-end gap-2">
+                              <IconButton as={Link} href={`/users/${u._id || u.id}`} label="View">
+                                <EyeIcon />
+                              </IconButton>
+                              {canUpdate &&
+                                !isDeletedUser &&
+                                (u.isActive ? (
+                                  <IconButton tone="danger" label="Suspend" onClick={() => setConfirm(u)}>
+                                    <BanIcon />
+                                  </IconButton>
+                                ) : (
+                                  <IconButton tone="success" label="Activate" onClick={() => setConfirm(u)}>
+                                    <CheckCircleIcon />
+                                  </IconButton>
+                                ))}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
-                {list.length === 0 && <Empty text="No users found" />}
+                {list.length === 0 && <Empty text={isDeletedTab ? "No deleted users found" : "No users found"} />}
                 {result && (
                   <Pagination
                     page={result.page}

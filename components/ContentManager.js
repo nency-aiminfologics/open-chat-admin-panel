@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useToast } from "@/lib/toast";
-import { Badge, Empty, ErrorBanner, Field, Modal, PageHeader, Spinner } from "@/components/ui";
+import { Badge, ButtonSpinner, Empty, ErrorBanner, Field, Modal, PageHeader, Spinner } from "@/components/ui";
 
 function defaultsFromFields(fields) {
   const obj = {};
@@ -150,8 +150,9 @@ export default function ContentManager({
             <button className="btn-secondary" onClick={() => setModal(null)}>
               Cancel
             </button>
-            <button className="btn-primary" disabled={saving} onClick={save}>
-              {saving ? "Saving…" : "Save"}
+            <button className="btn-primary flex items-center justify-center gap-1.5" disabled={saving} onClick={save}>
+              {saving && <ButtonSpinner />}
+              Save
             </button>
           </>
         }

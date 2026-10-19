@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ApiError, setupAdminPassword } from "@/lib/api";
+import { ButtonSpinner } from "@/components/ui";
 
 const MIN_LENGTH = 12;
 const MAX_BYTES = 72;
@@ -137,8 +138,9 @@ export default function SetupPasswordPage() {
               </p>
             )}
 
-            <button type="submit" className="btn-primary w-full" disabled={loading}>
-              {loading ? "Saving…" : "Set password"}
+            <button type="submit" className="btn-primary w-full flex items-center justify-center gap-2" disabled={loading}>
+              {loading && <ButtonSpinner />}
+              Set password
             </button>
             <p className="mt-4 text-center text-xs text-white/40">
               Invitation links are single-use and expire 24 hours after they are sent.

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useToast } from "@/lib/toast";
-import { Badge, Empty, ErrorBanner, Field, Modal, PageHeader, Pagination, Spinner } from "@/components/ui";
+import { Badge, ButtonSpinner, Empty, ErrorBanner, Field, Modal, PageHeader, Pagination, Spinner } from "@/components/ui";
 
 const norm = (s) => String(s || "").trim().toLowerCase();
 
@@ -235,8 +235,9 @@ export default function TaxonomyManager({ title, subtitle, noun, token, list, cr
             <button className="btn-secondary" onClick={() => setModal(null)}>
               Cancel
             </button>
-            <button className="btn-primary" disabled={saving} onClick={save}>
-              {saving ? "Saving…" : "Save"}
+            <button className="btn-primary flex items-center justify-center gap-1.5" disabled={saving} onClick={save}>
+              {saving && <ButtonSpinner />}
+              Save
             </button>
           </>
         }
@@ -270,8 +271,9 @@ export default function TaxonomyManager({ title, subtitle, noun, token, list, cr
             <button className="btn-secondary" onClick={() => setDeleteTarget(null)}>
               Cancel
             </button>
-            <button className="btn-danger" disabled={deleting} onClick={confirmDelete}>
-              {deleting ? "Deleting…" : "Delete"}
+            <button className="btn-danger flex items-center justify-center gap-1.5" disabled={deleting} onClick={confirmDelete}>
+              {deleting && <ButtonSpinner className="h-4 w-4 border-white border-t-transparent" />}
+              Delete
             </button>
           </>
         }

@@ -6,7 +6,7 @@ import { useStore } from "@/lib/store";
 import { useToast } from "@/lib/toast";
 import { ApiError, changeAdminPassword } from "@/lib/api";
 import { firstAllowedPage } from "@/lib/permissions";
-import { ErrorBanner, Field, PageHeader } from "@/components/ui";
+import { ButtonSpinner, ErrorBanner, Field, PageHeader } from "@/components/ui";
 
 const MIN_LENGTH = 12;
 const MAX_BYTES = 72;
@@ -112,8 +112,9 @@ export default function ChangePasswordPage() {
             onChange={(e) => setConfirm(e.target.value)}
           />
         </Field>
-        <button type="submit" className="btn-primary" disabled={saving}>
-          {saving ? "Saving…" : "Change password"}
+        <button type="submit" className="btn-primary flex items-center justify-center gap-1.5" disabled={saving}>
+          {saving && <ButtonSpinner />}
+          Change password
         </button>
       </form>
     </>

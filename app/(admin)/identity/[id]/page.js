@@ -7,7 +7,7 @@ import { useStore } from "@/lib/store";
 import { useToast } from "@/lib/toast";
 import { getVerificationDetail, reviewGovDocument, reviewUserSkill, reviewVerification } from "@/lib/api";
 import { PERMISSIONS } from "@/lib/permissions";
-import { BackLink, Badge, ErrorBanner, PageHeader, Spinner, fmtDateTime } from "@/components/ui";
+import { BackLink, Badge, ButtonSpinner, ErrorBanner, PageHeader, Spinner, fmtDateTime } from "@/components/ui";
 
 function Info({ label, value }) {
   return (
@@ -100,8 +100,9 @@ function ReviewAction({ title, onSubmit, pending, options = ["approved", "reject
             </option>
           ))}
         </select>
-        <button className="btn-primary !px-3 !py-1.5" disabled={pending} onClick={submit}>
-          {pending ? "Saving…" : "Submit"}
+        <button className="btn-primary flex items-center justify-center gap-1.5 !px-3 !py-1.5" disabled={pending} onClick={submit}>
+          {pending && <ButtonSpinner className="h-3.5 w-3.5" />}
+          Submit
         </button>
       </div>
       {status === "rejected" && (

@@ -144,6 +144,9 @@ export default function UserDetail() {
   // The verification submission's real _id surfaces here as govDocuments[].id (one gov document per submission).
   const submissionId = user.verification?.govDocuments?.[0]?.id;
 
+  const isDeletedUser = user.accountStatus === "deleted" || user.isDeleted === true;
+  const userStatus = isDeletedUser ? "deleted" : user.isActive ? "active" : "suspended";
+
   return (
     <>
       <BackLink href="/users" label="Back to users" />
@@ -157,13 +160,13 @@ export default function UserDetail() {
                 {(user.name || user.email || "?").slice(0, 2).toUpperCase()}
               </span>
             )}
-            {user.name || user.email}
+            {user.name || (isDeletedUser ? "Deleted User" : user.email || "—")}
           </span>
         }
-        subtitle={user.position || user.email}
+        subtitle={user.position || user.email || (isDeletedUser ? "Deleted account" : undefined)}
       >
-        <PresenceBadge online={user.isOnline} lastSeenAt={user.lastSeenAt} />
-        <Badge status={user.isActive ? "active" : "suspended"} />
+        {!isDeletedUser && <PresenceBadge online={user.isOnline} lastSeenAt={user.lastSeenAt} />}
+        <Badge status={userStatus} />
         {canSeeReports && (user.strikeCount ?? 0) > 0 && (
           <Link
             href={`/reports/${user._id || id}`}
@@ -175,6 +178,7 @@ export default function UserDetail() {
           </Link>
         )}
         {canUpdate &&
+          !isDeletedUser &&
           (user.isActive ? (
             <button className="btn-danger" onClick={() => setConfirmDeactivate(true)}>
               Suspend account
@@ -192,19 +196,21 @@ export default function UserDetail() {
         <section className="card p-5">
           <h2 className="mb-4 font-semibold">Profile</h2>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Info label="Email" value={user.email} />
+            <Info label="Email" value={user.email || (isDeletedUser ? "Unavailable" : null)} />
             <Info label="Phone" value={user.phone} />
             <Info label="Role" value={<span className="capitalize">{user.role}</span>} />
-            <Info label="Joined" value={fmtDate(user.createdAt)} />
-            <Info label="Country" value={user.countryName || user.country} />
+            <Info label="Registered" value={fmtDate(user.createdAt)} />
+            <Info label="Country" value={user.countryName || user.country || (isDeletedUser ? "Unavailable" : null)} />
             <Info
               label="Presence"
               value={
-                user.isOnline
-                  ? "Online now"
-                  : user.lastSeenAt
-                    ? `Last seen ${fmtRelative(user.lastSeenAt)}`
-                    : "Offline — never recorded"
+                isDeletedUser
+                  ? "Deleted"
+                  : user.isOnline
+                    ? "Online now"
+                    : user.lastSeenAt
+                      ? `Last seen ${fmtRelative(user.lastSeenAt)}`
+                      : "Offline — never recorded"
               }
             />
             <Info label="Strikes" value={String(user.strikeCount ?? 0)} />
@@ -373,14 +379,84 @@ export default function UserDetail() {
           </section>
         )}
 
-        {/* {extra.length > 0 && (
+        {user.accountHistory && (
           <section className="card p-5 lg:col-span-2">
-            <h2 className="mb-4 font-semibold">Additional details</h2>
-            <pre className="overflow-x-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
-              {JSON.stringify(Object.fromEntries(extra), null, 2)}
-            </pre>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="font-semibold text-slate-800">
+                  Related account history — manual review
+                  {user.accountHistory.requiresManualReview && (
+                    <span className="ml-2 rounded-full bg-warn-tint px-2.5 py-0.5 text-xs font-semibold text-warn-ink ring-1 ring-inset ring-warn/30">
+                      Review recommended
+                    </span>
+                  )}
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Matched via {user.accountHistory.matchBasis || "verified email"}. Shows historical accounts sharing the same email snapshot.
+                </p>
+              </div>
+              {user.accountHistory.total !== undefined && (
+                <span className="text-xs text-slate-400">Total: {user.accountHistory.total}</span>
+              )}
+            </div>
+
+            {(!user.accountHistory.items || user.accountHistory.items.length === 0) ? (
+              <p className="text-sm text-slate-400">No related historical accounts found.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2">User / Former name</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">Created</th>
+                      <th className="px-3 py-2">Strikes</th>
+                      <th className="px-3 py-2">Reports Recv / Open</th>
+                      <th className="px-3 py-2">Reports Filed</th>
+                      <th className="px-3 py-2 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {user.accountHistory.items.map((item) => (
+                      <tr key={item.id || item._id} className="hover:bg-slate-50">
+                        <td className="px-3 py-2 font-medium text-slate-800">
+                          {item.name || "Deleted User"}
+                          <div className="font-mono text-xs text-slate-400">{item.id || item._id}</div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <Badge status={item.accountStatus || (item.isDeleted ? "deleted" : "active")} />
+                        </td>
+                        <td className="px-3 py-2 text-xs text-slate-500">{fmtDate(item.createdAt)}</td>
+                        <td className="px-3 py-2 text-xs">
+                          {item.strikeCount ? (
+                            <CountChip value={item.strikeCount} tone={item.strikeCount > 1 ? "danger" : "warn"} />
+                          ) : (
+                            <span className="text-slate-400">0</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          <span className="font-medium text-slate-700">{item.reportsReceived ?? 0}</span>
+                          {item.openReportsReceived ? (
+                            <span className="ml-1 text-danger font-medium">({item.openReportsReceived} open)</span>
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-slate-600">{item.reportsFiled ?? 0}</td>
+                        <td className="px-3 py-2 text-right">
+                          <Link
+                            href={`/reports/${item.id || item._id}`}
+                            className="text-xs font-medium text-brand-600 hover:underline"
+                          >
+                            Inspect reports →
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </section>
-        )} */}
+        )}
       </div>
 
       <Modal

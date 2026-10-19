@@ -5,7 +5,7 @@ import { useStore } from "@/lib/store";
 import { PERMISSIONS } from "@/lib/permissions";
 import { useToast } from "@/lib/toast";
 import { getPrivacyPolicy, putPrivacyPolicy } from "@/lib/api";
-import { ErrorBanner, Field, PageHeader, Spinner, fmtDateTime } from "@/components/ui";
+import { ButtonSpinner, ErrorBanner, Field, PageHeader, Spinner, fmtDateTime } from "@/components/ui";
 
 const EMPTY = { title: "Privacy Policy", contentHtml: "", version: "1.0", effectiveAt: "", isActive: true };
 
@@ -129,8 +129,9 @@ export default function PoliciesPage() {
           />
         )}
         {canManage && (
-          <button className="btn-primary" disabled={saving} onClick={save}>
-            {saving ? "Saving…" : "Save policy"}
+          <button className="btn-primary flex items-center justify-center gap-1.5" disabled={saving} onClick={save}>
+            {saving && <ButtonSpinner />}
+            Save policy
           </button>
         )}
       </div>

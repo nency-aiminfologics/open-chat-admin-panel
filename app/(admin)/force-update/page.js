@@ -5,7 +5,7 @@ import { useStore } from "@/lib/store";
 import { useToast } from "@/lib/toast";
 import { getForceUpdateConfig, putForceUpdateConfig } from "@/lib/api";
 import { PERMISSIONS } from "@/lib/permissions";
-import { ErrorBanner, Field, PageHeader, Spinner, Tabs, fmtDateTime } from "@/components/ui";
+import { ButtonSpinner, ErrorBanner, Field, PageHeader, Spinner, Tabs, fmtDateTime } from "@/components/ui";
 
 /** The backend accepts exactly these platforms, each with its own stored config. */
 const PLATFORMS = [
@@ -245,8 +245,9 @@ export default function ForceUpdatePage() {
           </div>
 
           {canManage && (
-            <button className="btn-primary mt-6" disabled={saving} onClick={handleSaveClick}>
-              {saving ? "Saving…" : "Save settings"}
+            <button className="btn-primary mt-6 flex items-center justify-center gap-2" disabled={saving} onClick={handleSaveClick}>
+              {saving && <ButtonSpinner />}
+              Save settings
             </button>
           )}
 
@@ -269,11 +270,12 @@ export default function ForceUpdatePage() {
                   </button>
                   <button
                     type="button"
-                    className="btn-danger"
+                    className="btn-danger flex items-center justify-center gap-2"
                     onClick={executeSave}
                     disabled={saving}
                   >
-                    {saving ? "Saving…" : "Yes, apply mandatory update"}
+                    {saving && <ButtonSpinner className="h-4 w-4 border-white border-t-transparent" />}
+                    Yes, apply mandatory update
                   </button>
                 </div>
               </div>

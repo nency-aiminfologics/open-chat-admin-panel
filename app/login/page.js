@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { firstAllowedPage } from "@/lib/permissions";
+import { ButtonSpinner } from "@/components/ui";
 
 /** Sub-admins may not have dashboard access, and a pending invitation must set a password first. */
 function landingFor(admin) {
@@ -76,8 +77,9 @@ export default function LoginPage() {
           <p className="mb-4 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2.5 text-sm text-red-200">{error}</p>
         )}
 
-        <button type="submit" className="btn-primary w-full" disabled={loading}>
-          {loading ? "Signing in…" : "Sign in"}
+        <button type="submit" className="btn-primary w-full flex items-center justify-center gap-2" disabled={loading}>
+          {loading && <ButtonSpinner />}
+          Sign in
         </button>
       </form>
     </div>

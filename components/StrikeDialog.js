@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { addUserStrike, newIdempotencyKey } from "@/lib/api";
 import { useToast } from "@/lib/toast";
-import { Field, Modal } from "@/components/ui";
+import { ButtonSpinner, Field, Modal } from "@/components/ui";
 
 const MAX_NOTE = 2000;
 
@@ -67,8 +67,9 @@ export default function StrikeDialog({ open, onClose, token, user, strikeCount, 
           <button className="btn-secondary" onClick={onClose}>
             Cancel
           </button>
-          <button className={suspend ? "btn-danger" : "btn-primary"} disabled={saving} onClick={submit}>
-            {saving ? "Saving…" : suspend ? "Strike & suspend" : "Record strike"}
+          <button className={`${suspend ? "btn-danger" : "btn-primary"} flex items-center justify-center gap-1.5`} disabled={saving} onClick={submit}>
+            {saving && <ButtonSpinner className={suspend ? "border-white border-t-transparent" : ""} />}
+            {suspend ? "Strike & suspend" : "Record strike"}
           </button>
         </>
       }

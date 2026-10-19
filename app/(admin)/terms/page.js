@@ -5,7 +5,7 @@ import { useStore } from "@/lib/store";
 import { useToast } from "@/lib/toast";
 import { getTermsConditions, putTermsConditions } from "@/lib/api";
 import { PERMISSIONS } from "@/lib/permissions";
-import { ErrorBanner, Modal, PageHeader, Spinner, Tabs, fmtDateTime } from "@/components/ui";
+import { ButtonSpinner, ErrorBanner, Modal, PageHeader, Spinner, Tabs, fmtDateTime } from "@/components/ui";
 
 const MAX_BODY = 100000;
 
@@ -188,8 +188,9 @@ export default function TermsPage() {
 
         {canPublish && view === "draft" && (
           <div className="flex flex-wrap gap-2">
-            <button className="btn-secondary" disabled={saving || publishing} onClick={saveDraft}>
-              {saving ? "Saving…" : "Save draft"}
+            <button className="btn-secondary flex items-center justify-center gap-1.5" disabled={saving || publishing} onClick={saveDraft}>
+              {saving && <ButtonSpinner />}
+              Save draft
             </button>
             <button className="btn-primary" disabled={saving || publishing} onClick={() => setConfirmPublish(true)}>
               Publish new version
@@ -207,8 +208,9 @@ export default function TermsPage() {
             <button className="btn-secondary" onClick={() => setConfirmPublish(false)} disabled={publishing}>
               Cancel
             </button>
-            <button className="btn-primary" onClick={publish} disabled={publishing}>
-              {publishing ? "Publishing…" : "Publish"}
+            <button className="btn-primary flex items-center justify-center gap-1.5" onClick={publish} disabled={publishing}>
+              {publishing && <ButtonSpinner />}
+              Publish
             </button>
           </>
         }

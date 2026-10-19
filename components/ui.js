@@ -29,6 +29,7 @@ const BADGE = {
   unknown: "bg-slate-100 text-slate-600 ring-slate-200",
   false: "bg-danger-tint text-danger-ink ring-danger/30",
   closed: "bg-slate-100 text-slate-600 ring-slate-200",
+  deleted: "bg-slate-200 text-slate-700 ring-slate-300",
 };
 
 export function Badge({ status }) {
@@ -188,9 +189,14 @@ export function UserCell({ userId, user, size = "md", link = true, showStatus = 
       <span className="min-w-0">
         <span className="flex items-center gap-1.5">
           <span className="truncate text-sm font-medium text-slate-800">{user.name || "—"}</span>
-          {showStatus && user.isActive === false && <Badge status="suspended" />}
+          {showStatus &&
+            (user.accountStatus === "deleted" || user.isDeleted ? (
+              <Badge status="deleted" />
+            ) : (
+              user.isActive === false && <Badge status="suspended" />
+            ))}
         </span>
-        <span className="block truncate text-xs text-slate-500">{user.email}</span>
+        <span className="block truncate text-xs text-slate-500">{user.email || "Unavailable"}</span>
       </span>
     </>
   );
@@ -208,6 +214,12 @@ export function Spinner() {
     <div className="flex items-center justify-center py-14">
       <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-brand-500" />
     </div>
+  );
+}
+
+export function ButtonSpinner({ className = "h-4 w-4" }) {
+  return (
+    <span className={`inline-block animate-spin rounded-full border-2 border-current border-t-transparent ${className}`} />
   );
 }
 
