@@ -138,64 +138,163 @@ export default function VerificationDetail() {
 
   const canReview = can(PERMISSIONS.verificationReview);
 
-  const load = () => {
+  const fetchDetail = async ({ silent = false } = {}) => {
     if (!token || !id) return;
-    setLoading(true);
-    setError("");
-    getVerificationDetail(token, id)
-      .then(setData)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+    if (!silent) setLoading(true);
+    try {
+      setData(await getVerificationDetail(token, id));
+      setError("");
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
+
+  const load = () => {
+    fetchDetail();
   };
 
   useEffect(load, [token, id]);
 
   const bulkReview = async (decision, adminNotes) => {
     setBusy(true);
+    let shouldReload = false;
+    let conflictMessage = "";
     try {
       const updated = await reviewVerification(token, id, { decision, adminNotes });
       setData(updated);
       toast(`Submission ${decision === "approve" ? "approved" : "rejected"}`, "success");
+      shouldReload = true;
     } catch (e) {
-      setError(e.message);
       toast(e.message, "error");
+      if (e.status === 409) {
+        shouldReload = true;
+        conflictMessage = e.message;
+      } else {
+        setError(e.message);
+      }
     } finally {
+      if (shouldReload) await fetchDetail({ silent: true });
+      if (conflictMessage) setError(conflictMessage);
       setBusy(false);
     }
   };
 
-  const govDocReview = async (status, rejectionReason) => {
+  const govDocReview = async (arg1, arg2, arg3) => {
+    let doc = primaryDoc;
+    let status = "";
+    let rejectionReason = "";
+
+    if (arg1 && typeof arg1 === "object") {
+      doc = arg1;
+      status = arg2;
+      rejectionReason = arg3;
+    } else {
+      status = arg1;
+      rejectionReason = arg2;
+      if (arg3 && typeof arg3 === "object") {
+        doc = arg3;
+      }
+    }
+
+    const govDocsList = Array.isArray(data?.governmentDocuments) ? data.governmentDocuments : [];
+    const targetDoc = doc || govDocsList[0] || {};
+    const targetDocId = targetDoc.id || targetDoc._id || targetDoc.documentId;
+
+    // Find the matching item in data.governmentDocuments
+    const matchingDoc =
+      govDocsList.find((d) => {
+        if (targetDocId && (d.id === targetDocId || d._id === targetDocId || d.documentId === targetDocId)) {
+          return true;
+        }
+        if (d.sources?.some((s) => (s?.submissionId || s?.id || s?._id || s) === id)) {
+          return true;
+        }
+        if (d.submissionId === id) {
+          return true;
+        }
+        return false;
+      }) ||
+      targetDoc ||
+      govDocsList[0];
+
+    const govDocSourceId =
+      matchingDoc?.sources?.[0]?.submissionId ||
+      matchingDoc?.id ||
+      matchingDoc?._id ||
+      matchingDoc?.documentId ||
+      id;
+
+    // Retain documentRevision from the matching document or submission data
+    const rawRevision =
+      matchingDoc?.documentRevision ??
+      matchingDoc?.revision ??
+      targetDoc?.documentRevision ??
+      targetDoc?.revision ??
+      data?.documentRevision ??
+      data?.governmentDocumentRevision ??
+      data?.revision;
+
+    const documentRevision =
+      rawRevision !== undefined && rawRevision !== null && rawRevision !== ""
+        ? (typeof rawRevision === "number" ? rawRevision : (Number.isNaN(Number(rawRevision)) ? rawRevision : Number(rawRevision)))
+        : undefined;
+
     setBusy(true);
+    let shouldReload = false;
+    let conflictMessage = "";
     try {
-      const govDocSourceId = data?.governmentDocuments?.[0]?.sources?.[0]?.submissionId || id;
       await reviewGovDocument(token, govDocSourceId, {
         status,
         ...(status === "rejected" ? { rejectionReason } : {}),
+        ...(documentRevision !== undefined && documentRevision !== null ? { documentRevision } : {}),
       });
       toast(`Government document ${status.replace("_", " ")}`, "success");
-      load();
+      shouldReload = true;
     } catch (e) {
-      setError(e.message);
       toast(e.message, "error");
+      if (e.status === 409) {
+        shouldReload = true;
+        conflictMessage = e.message;
+      } else {
+        setError(e.message);
+      }
     } finally {
+      if (shouldReload) await fetchDetail({ silent: true });
+      if (conflictMessage) setError(conflictMessage);
       setBusy(false);
     }
   };
 
-  const skillReview = async (skillId, status, rejectionReason) => {
+  const skillReview = async (skillOrId, status, rejectionReason) => {
+    const skillObj = typeof skillOrId === "object" && skillOrId !== null ? skillOrId : null;
+    const skillId = skillObj ? (skillObj.id || skillObj._id) : skillOrId;
+    const verificationId = skillObj?.verificationId || data?.review?.targets?.[0]?.verificationId;
+
     setBusy(true);
+    let shouldReload = false;
+    let conflictMessage = "";
     try {
-      const targetUserId = data?.userId || data?.user?.id;
+      const targetUserId = data?.userId || data?.user?.id || data?.user?._id;
       await reviewUserSkill(token, targetUserId, skillId, {
         status,
         ...(status === "rejected" ? { rejectionReason } : {}),
+        ...(verificationId ? { verificationId } : {}),
       });
       toast(`Skill ${status.replace("_", " ")}`, "success");
-      load();
+      shouldReload = true;
     } catch (e) {
-      setError(e.message);
       toast(e.message, "error");
+      if (e.status === 409) {
+        shouldReload = true;
+        conflictMessage = e.message;
+      } else {
+        setError(e.message);
+      }
     } finally {
+      if (shouldReload) await fetchDetail({ silent: true });
+      if (conflictMessage) setError(conflictMessage);
       setBusy(false);
     }
   };
@@ -214,7 +313,7 @@ export default function VerificationDetail() {
   const skills = Array.isArray(data.skills) ? data.skills : (data.skillIds || []);
   const govDocs = Array.isArray(data.governmentDocuments) ? data.governmentDocuments : [];
   const primaryDoc = govDocs[0] || {};
-  
+
   // Combine or extract certificates by kind
   const allCertificates = Array.isArray(data.certificates) ? data.certificates : [];
   const certificateFiles = allCertificates.length > 0
@@ -272,6 +371,14 @@ export default function VerificationDetail() {
               label="Government document status"
               value={primaryDoc.status || data.governmentDocumentStatus}
             />
+            {((primaryDoc.documentRevision !== undefined && primaryDoc.documentRevision !== null) ||
+              (primaryDoc.revision !== undefined && primaryDoc.revision !== null) ||
+              (data.documentRevision !== undefined && data.documentRevision !== null)) && (
+                <Info
+                  label="Document revision"
+                  value={`Revision ${primaryDoc.documentRevision ?? primaryDoc.revision ?? data.documentRevision}`}
+                />
+              )}
             <Info
               label="Reviewed by"
               value={currentTarget?.reviewedByUser?.name || currentTarget?.reviewedByUser?.email || data.reviewedByUser?.name || data.reviewedByUser?.email}
@@ -288,11 +395,11 @@ export default function VerificationDetail() {
             </div>
           )}
 
-          {(primaryDoc.rejectionReason || data.governmentDocumentRejectionReason) && (
+          {/* {(primaryDoc.rejectionReason || data.governmentDocumentRejectionReason) && (
             <p className="mt-3 rounded-lg bg-danger-tint px-3 py-2 text-sm text-danger-ink">
               <b>Rejection reason:</b> {primaryDoc.rejectionReason || data.governmentDocumentRejectionReason}
             </p>
-          )}
+          )} */}
         </section>
 
         {/* Evidence Card */}
@@ -330,9 +437,75 @@ export default function VerificationDetail() {
 
         {/* Government Document Review */}
         <section className="card p-5">
-          <h2 className="mb-4 font-semibold">Government document</h2>
-          <p className="mb-3 text-sm text-slate-500">Reviews the ID document on this submission.</p>
-          {canReview ? <ReviewAction pending={busy} onSubmit={govDocReview} /> : <ReadOnlyNote />}
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-semibold">
+              Government document{govDocs.length > 1 ? `s (${govDocs.length})` : ""}
+            </h2>
+            {govDocs.length <= 1 && primaryDoc.status && <Badge status={primaryDoc.status} />}
+          </div>
+          <p className="mb-3 text-sm text-slate-500">
+            Reviews the ID document on this submission.
+            {govDocs.length <= 1 &&
+              (primaryDoc.documentRevision !== undefined || primaryDoc.revision !== undefined || data.documentRevision !== undefined) && (
+                <span className="ml-1 font-medium text-slate-700">
+                  (Revision {primaryDoc.documentRevision ?? primaryDoc.revision ?? data.documentRevision})
+                </span>
+              )}
+          </p>
+          {govDocs.length > 1 ? (
+            <div className="space-y-4">
+              {govDocs.map((doc, idx) => {
+                const docId = doc.id || doc._id || doc.documentId || idx;
+                const revision = doc.documentRevision ?? doc.revision;
+                return (
+                  <div key={docId} className="rounded-lg border border-slate-200 p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-sm font-medium text-slate-700">
+                        {doc.documentType || `Document #${idx + 1}`}
+                        {revision !== undefined && (
+                          <span className="ml-2 text-xs font-normal text-slate-400">
+                            (Rev {revision})
+                          </span>
+                        )}
+                      </p>
+                      {doc.status && <Badge status={doc.status} />}
+                    </div>
+                    {(doc.rejectionReason || doc.reason) && (
+                      <p className="mb-3 rounded-lg bg-danger-tint px-3 py-2 text-sm text-danger-ink">
+                        <b>Rejection reason:</b> {doc.rejectionReason || doc.reason}
+                      </p>
+                    )}
+                    {canReview ? (
+                      <ReviewAction
+                        key={`gov-doc-${docId}-${revision ?? 0}`}
+                        pending={busy}
+                        onSubmit={(status, reason) => govDocReview(doc, status, reason)}
+                      />
+                    ) : (
+                      <ReadOnlyNote />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <>
+              {(primaryDoc.rejectionReason || data.governmentDocumentRejectionReason) && (
+                <p className="mb-3 rounded-lg bg-danger-tint px-3 py-2 text-sm text-danger-ink">
+                  <b>Rejection reason:</b> {primaryDoc.rejectionReason || data.governmentDocumentRejectionReason}
+                </p>
+              )}
+              {canReview ? (
+                <ReviewAction
+                  key={`gov-doc-${primaryDoc.id || primaryDoc._id || id}-${primaryDoc.documentRevision ?? primaryDoc.revision ?? data.documentRevision ?? 0}`}
+                  pending={busy}
+                  onSubmit={govDocReview}
+                />
+              ) : (
+                <ReadOnlyNote />
+              )}
+            </>
+          )}
         </section>
 
         {/* Skills Review */}
@@ -342,6 +515,7 @@ export default function VerificationDetail() {
           <div className="space-y-4">
             {skills.map((s) => {
               const skillId = s.id || s._id;
+              const skillRejection = s.rejectionReason || s.reason || s.adminNotes;
               return (
                 <div key={skillId} className="rounded-lg border border-slate-200 p-3">
                   <div className="mb-2 flex items-center justify-between">
@@ -351,8 +525,17 @@ export default function VerificationDetail() {
                     </p>
                     {s.displayStatus && <Badge status={s.displayStatus} />}
                   </div>
+                  {skillRejection && (
+                    <p className="mb-3 rounded-lg bg-danger-tint px-3 py-2 text-sm text-danger-ink">
+                      <b>Rejection reason:</b> {skillRejection}
+                    </p>
+                  )}
                   {canReview ? (
-                    <ReviewAction pending={busy} onSubmit={(status, reason) => skillReview(skillId, status, reason)} />
+                    <ReviewAction
+                      key={`${skillId}-${s.verificationId || s.displayStatus || s.status}`}
+                      pending={busy}
+                      onSubmit={(status, reason) => skillReview(s, status, reason)}
+                    />
                   ) : (
                     <ReadOnlyNote />
                   )}
