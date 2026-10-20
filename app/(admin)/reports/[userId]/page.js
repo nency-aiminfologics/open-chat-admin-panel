@@ -8,6 +8,7 @@ import { useToast } from "@/lib/toast";
 import { listReportsForUser, updateReportStatus } from "@/lib/api";
 import { PERMISSIONS } from "@/lib/permissions";
 import StrikeDialog from "@/components/StrikeDialog";
+import BlockHistorySection from "@/components/BlockHistorySection";
 import {
   BackLink,
   Badge,
@@ -17,6 +18,7 @@ import {
   PageHeader,
   Pagination,
   Spinner,
+  Tabs,
   UserCell,
   fmtDateTime,
 } from "@/components/ui";
@@ -66,6 +68,7 @@ export default function UserReportsPage() {
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState(null);
   const [strikeOpen, setStrikeOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("reports");
 
   const canModerate = can(PERMISSIONS.reportsModerate);
 
@@ -130,74 +133,87 @@ export default function UserReportsPage() {
 
       <ErrorBanner error={error} onRetry={load} />
 
-      <div className="card overflow-x-auto">
-        {loading ? (
-          <Spinner />
-        ) : (
-          <>
-            <table className="w-full">
-              <thead className="border-b border-slate-200 bg-slate-50">
-                <tr>
-                  <th className="th">Reporter</th>
-                  <th className="th">Reason</th>
-                  <th className="th">Details</th>
-                  <th className="th">Filed</th>
-                  <th className="th text-right">Status / actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {list.map((r) => (
-                  <tr key={r.id} className="hover:bg-slate-50">
-                    <td className="td">
-                      <UserCell userId={r.reporterId} user={r.reporter} size="sm" />
-                    </td>
-                    <td className="td">{r.reason}</td>
-                    <td className="td max-w-xs truncate text-slate-600" title={r.description || r.details || ""}>
-                      {r.description || r.details || "—"}
-                    </td>
-                    <td className="td">{fmtDateTime(r.createdAt)}</td>
-                    <td className="td text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {r.status === "open" && canModerate ? (
-                          <>
-                            <IconButton
-                              label="Dismiss"
-                              disabled={busyId === r.id}
-                              onClick={() => setStatusFor(r.id, "dismissed")}
-                            >
-                              <XCircleIcon />
-                            </IconButton>
-                            <IconButton
-                              tone="success"
-                              label="Reviewed"
-                              disabled={busyId === r.id}
-                              onClick={() => setStatusFor(r.id, "reviewed")}
-                            >
-                              <CheckCircleIcon />
-                            </IconButton>
-                          </>
-                        ) : (
-                          <Badge status={r.status} />
-                        )}
-                      </div>
-                    </td>
+      <Tabs
+        value={activeTab}
+        onChange={setActiveTab}
+        tabs={[
+          { value: "reports", label: "Reports", count: reports?.total },
+          { value: "activity", label: "Block / unblock activity" },
+        ]}
+      />
+
+      {activeTab === "reports" ? (
+        <div className="card overflow-x-auto">
+          {loading ? (
+            <Spinner />
+          ) : (
+            <>
+              <table className="w-full">
+                <thead className="border-b border-slate-200 bg-slate-50">
+                  <tr>
+                    <th className="th">Reporter</th>
+                    <th className="th">Reason</th>
+                    <th className="th">Details</th>
+                    <th className="th">Filed</th>
+                    <th className="th text-right">Status / actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            {list.length === 0 && <Empty text="No reports on this page" />}
-            {reports && (
-              <Pagination
-                page={reports.page}
-                totalPages={reports.totalPages}
-                hasPreviousPage={reports.hasPreviousPage}
-                hasNextPage={reports.hasNextPage}
-                onChange={setPage}
-              />
-            )}
-          </>
-        )}
-      </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {list.map((r) => (
+                    <tr key={r.id} className="hover:bg-slate-50">
+                      <td className="td">
+                        <UserCell userId={r.reporterId} user={r.reporter} size="sm" />
+                      </td>
+                      <td className="td">{r.reason}</td>
+                      <td className="td max-w-xs truncate text-slate-600" title={r.description || r.details || ""}>
+                        {r.description || r.details || "—"}
+                      </td>
+                      <td className="td">{fmtDateTime(r.createdAt)}</td>
+                      <td className="td text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {r.status === "open" && canModerate ? (
+                            <>
+                              <IconButton
+                                label="Dismiss"
+                                disabled={busyId === r.id}
+                                onClick={() => setStatusFor(r.id, "dismissed")}
+                              >
+                                <XCircleIcon />
+                              </IconButton>
+                              <IconButton
+                                tone="success"
+                                label="Reviewed"
+                                disabled={busyId === r.id}
+                                onClick={() => setStatusFor(r.id, "reviewed")}
+                              >
+                                <CheckCircleIcon />
+                              </IconButton>
+                            </>
+                          ) : (
+                            <Badge status={r.status} />
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {list.length === 0 && <Empty text="No reports on this page" />}
+              {reports && (
+                <Pagination
+                  page={reports.page}
+                  totalPages={reports.totalPages}
+                  hasPreviousPage={reports.hasPreviousPage}
+                  hasNextPage={reports.hasNextPage}
+                  onChange={setPage}
+                />
+              )}
+            </>
+          )}
+        </div>
+      ) : (
+        <BlockHistorySection userId={userId} token={token} reporters={list} />
+      )}
 
       <StrikeDialog
         open={strikeOpen}

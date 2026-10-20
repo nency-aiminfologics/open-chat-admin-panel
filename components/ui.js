@@ -30,6 +30,8 @@ const BADGE = {
   false: "bg-danger-tint text-danger-ink ring-danger/30",
   closed: "bg-slate-100 text-slate-600 ring-slate-200",
   deleted: "bg-slate-200 text-slate-700 ring-slate-300",
+  blocked: "bg-danger-tint text-danger-ink ring-danger/30",
+  unblocked: "bg-success-tint text-success-ink ring-success/30",
 };
 
 export function Badge({ status }) {
