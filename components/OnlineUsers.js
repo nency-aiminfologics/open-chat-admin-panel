@@ -170,7 +170,9 @@ export default function OnlineUsers({ token, limit = 10, onCount }) {
               <li key={u._id || u.id} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50">
                 <UserCell userId={u._id || u.id} user={u} size="sm" />
                 <div className="flex shrink-0 items-center gap-3">
-                  {u.country && <span className="text-xs text-slate-500">{u.country}</span>}
+                  {(u.countryName || u.country) && (
+                    <span className="text-xs text-slate-500">{u.countryName || u.country}</span>
+                  )}
                   <PresenceBadge online />
                 </div>
               </li>

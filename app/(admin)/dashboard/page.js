@@ -286,7 +286,7 @@ export default function Dashboard() {
                     {snapshot?.activeAccounts ?? 0}
                   </span>
                   {canSeeUsers && (
-                    <Link href="/users" className="text-xs font-semibold text-brand-600 hover:text-brand-700">
+                    <Link href="/users?isActive=true" className="text-xs font-semibold text-brand-600 hover:text-brand-700">
                       View →
                     </Link>
                   )}
@@ -320,7 +320,7 @@ export default function Dashboard() {
                     </span>
                   )}
                   {canSeeUsers && (
-                    <Link href="/users" className="text-xs font-semibold text-brand-600 hover:text-brand-700">
+                    <Link href="/users?tab=online" className="text-xs font-semibold text-brand-600 hover:text-brand-700">
                       Users →
                     </Link>
                   )}

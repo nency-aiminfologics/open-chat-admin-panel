@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { useToast } from "@/lib/toast";
 import { listUsers, updateUser } from "@/lib/api";
@@ -68,11 +69,18 @@ const CheckCircleIcon = () => (
 export default function UsersPage() {
   const { token, can } = useStore();
   const toast = useToast();
-  const [view, setView] = useState("all");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const initialTab = searchParams.get("tab");
+  const validTab = initialTab === "online" || initialTab === "deleted" ? initialTab : "all";
+  const initialActive = searchParams.get("isActive") || "";
+
+  const [view, setView] = useState(validTab);
   const [q, setQ] = useState("");
   const [search, setSearch] = useState("");
   const [country, setCountry] = useState("");
-  const [isActive, setIsActive] = useState("");
+  const [isActive, setIsActive] = useState(initialActive);
   const [page, setPage] = useState(1);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -80,6 +88,20 @@ export default function UsersPage() {
   const [confirm, setConfirm] = useState(null);
 
   const canUpdate = can(PERMISSIONS.usersUpdate);
+
+  // Sync tab and isActive with URL search parameters if they change
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "online" || tabParam === "deleted" || tabParam === "all") {
+      setView(tabParam);
+    }
+    const activeParam = searchParams.get("isActive");
+    if (activeParam === "true" || activeParam === "false") {
+      setIsActive(activeParam);
+    } else if (activeParam === null) {
+      setIsActive("");
+    }
+  }, [searchParams]);
 
   const load = () => {
     if (!token) return;
@@ -110,6 +132,14 @@ export default function UsersPage() {
   const handleTabChange = (nextTab) => {
     setView(nextTab);
     setPage(1);
+    const params = new URLSearchParams(window.location.search);
+    if (nextTab === "all") {
+      params.delete("tab");
+    } else {
+      params.set("tab", nextTab);
+    }
+    const qs = params.toString();
+    router.replace(qs ? `/users?${qs}` : "/users", { scroll: false });
   };
 
   const submitSearch = (e) => {
@@ -186,8 +216,17 @@ export default function UsersPage() {
                 className="input !w-auto"
                 value={isActive}
                 onChange={(e) => {
+                  const val = e.target.value;
                   setPage(1);
-                  setIsActive(e.target.value);
+                  setIsActive(val);
+                  const params = new URLSearchParams(window.location.search);
+                  if (val) {
+                    params.set("isActive", val);
+                  } else {
+                    params.delete("isActive");
+                  }
+                  const qs = params.toString();
+                  router.replace(qs ? `/users?${qs}` : "/users", { scroll: false });
                 }}
               >
                 <option value="">All accounts</option>
