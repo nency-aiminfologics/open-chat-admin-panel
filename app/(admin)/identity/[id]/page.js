@@ -9,6 +9,11 @@ import { getVerificationDetail, reviewGovDocument, reviewUserSkill, reviewVerifi
 import { PERMISSIONS } from "@/lib/permissions";
 import { BackLink, Badge, ButtonSpinner, ErrorBanner, PageHeader, Spinner, fmtDateTime } from "@/components/ui";
 
+/** Keys that identify which review is currently in flight (so only that button shows a spinner). */
+const BULK_KEY = "bulk";
+const govKey = (doc) => `gov-${doc?.id || doc?._id || doc?.documentId || "primary"}`;
+const skillKey = (skillId) => `skill-${skillId}`;
+
 function Info({ label, value }) {
   return (
     <div>
@@ -75,7 +80,17 @@ function LinkList({ label, items }) {
 
 const STATUS_LABELS = { approved: "Approve", rejected: "Reject", under_review: "Mark under review" };
 
-function ReviewAction({ title, onSubmit, pending, options = ["approved", "rejected", "under_review"] }) {
+/**
+ * pending  -> THIS review is being submitted (shows spinner)
+ * disabled -> some OTHER review is being submitted (greyed out, no spinner)
+ */
+function ReviewAction({
+  title,
+  onSubmit,
+  pending = false,
+  disabled = false,
+  options = ["approved", "rejected", "under_review"],
+}) {
   const [status, setStatus] = useState(options[0]);
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
@@ -93,14 +108,23 @@ function ReviewAction({ title, onSubmit, pending, options = ["approved", "reject
     <div className="rounded-lg bg-slate-50 p-3">
       {title && <p className="mb-2 text-sm font-medium text-slate-700">{title}</p>}
       <div className="flex flex-wrap items-center gap-2">
-        <select className="input !w-auto" value={status} onChange={(e) => setStatus(e.target.value)}>
+        <select
+          className="input !w-auto"
+          value={status}
+          disabled={pending || disabled}
+          onChange={(e) => setStatus(e.target.value)}
+        >
           {options.map((o) => (
             <option key={o} value={o}>
               {STATUS_LABELS[o] || o}
             </option>
           ))}
         </select>
-        <button className="btn-primary flex items-center justify-center gap-1.5 !px-3 !py-1.5" disabled={pending} onClick={submit}>
+        <button
+          className="btn-primary flex items-center justify-center gap-1.5 !px-3 !py-1.5"
+          disabled={pending || disabled}
+          onClick={submit}
+        >
           {pending && <ButtonSpinner className="h-3.5 w-3.5" />}
           Submit
         </button>
@@ -135,7 +159,10 @@ export default function VerificationDetail() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+
+  // Which single review is currently being submitted (null = none).
+  const [busyKey, setBusyKey] = useState(null);
+  const anyBusy = busyKey !== null;
 
   const canReview = can(PERMISSIONS.verificationReview);
 
@@ -159,7 +186,7 @@ export default function VerificationDetail() {
   useEffect(load, [token, id]);
 
   const bulkReview = async (decision, adminNotes) => {
-    setBusy(true);
+    setBusyKey(BULK_KEY);
     let shouldReload = false;
     let conflictMessage = "";
     try {
@@ -178,12 +205,14 @@ export default function VerificationDetail() {
     } finally {
       if (shouldReload) await fetchDetail({ silent: true });
       if (conflictMessage) setError(conflictMessage);
-      setBusy(false);
+      setBusyKey(null);
     }
   };
 
   const govDocReview = async (arg1, arg2, arg3) => {
-    let doc = primaryDoc;
+    const govDocsList = Array.isArray(data?.governmentDocuments) ? data.governmentDocuments : [];
+
+    let doc = govDocsList[0];
     let status = "";
     let rejectionReason = "";
 
@@ -199,7 +228,6 @@ export default function VerificationDetail() {
       }
     }
 
-    const govDocsList = Array.isArray(data?.governmentDocuments) ? data.governmentDocuments : [];
     const targetDoc = doc || govDocsList[0] || {};
     const targetDocId = targetDoc.id || targetDoc._id || targetDoc.documentId;
 
@@ -239,10 +267,14 @@ export default function VerificationDetail() {
 
     const documentRevision =
       rawRevision !== undefined && rawRevision !== null && rawRevision !== ""
-        ? (typeof rawRevision === "number" ? rawRevision : (Number.isNaN(Number(rawRevision)) ? rawRevision : Number(rawRevision)))
+        ? typeof rawRevision === "number"
+          ? rawRevision
+          : Number.isNaN(Number(rawRevision))
+            ? rawRevision
+            : Number(rawRevision)
         : undefined;
 
-    setBusy(true);
+    setBusyKey(govKey(targetDoc));
     let shouldReload = false;
     let conflictMessage = "";
     try {
@@ -264,16 +296,16 @@ export default function VerificationDetail() {
     } finally {
       if (shouldReload) await fetchDetail({ silent: true });
       if (conflictMessage) setError(conflictMessage);
-      setBusy(false);
+      setBusyKey(null);
     }
   };
 
   const skillReview = async (skillOrId, status, rejectionReason) => {
     const skillObj = typeof skillOrId === "object" && skillOrId !== null ? skillOrId : null;
-    const skillId = skillObj ? (skillObj.id || skillObj._id) : skillOrId;
+    const skillId = skillObj ? skillObj.id || skillObj._id : skillOrId;
     const verificationId = skillObj?.verificationId || data?.review?.targets?.[0]?.verificationId;
 
-    setBusy(true);
+    setBusyKey(skillKey(skillId));
     let shouldReload = false;
     let conflictMessage = "";
     try {
@@ -296,7 +328,7 @@ export default function VerificationDetail() {
     } finally {
       if (shouldReload) await fetchDetail({ silent: true });
       if (conflictMessage) setError(conflictMessage);
-      setBusy(false);
+      setBusyKey(null);
     }
   };
 
@@ -311,22 +343,20 @@ export default function VerificationDetail() {
     );
 
   const user = data.user;
-  const skills = Array.isArray(data.skills) ? data.skills : (data.skillIds || []);
+  const skills = Array.isArray(data.skills) ? data.skills : data.skillIds || [];
   const govDocs = Array.isArray(data.governmentDocuments) ? data.governmentDocuments : [];
   const primaryDoc = govDocs[0] || {};
 
   // Combine or extract certificates by kind
   const allCertificates = Array.isArray(data.certificates) ? data.certificates : [];
-  const certificateFiles = allCertificates.length > 0
-    ? allCertificates.filter((c) => c.kind !== "link")
-    : (data.certificateFileUrls || []);
-  const certificateLinks = allCertificates.length > 0
-    ? allCertificates.filter((c) => c.kind === "link")
-    : (data.certificateLinks || []);
+  const certificateFiles =
+    allCertificates.length > 0 ? allCertificates.filter((c) => c.kind !== "link") : data.certificateFileUrls || [];
+  const certificateLinks =
+    allCertificates.length > 0 ? allCertificates.filter((c) => c.kind === "link") : data.certificateLinks || [];
 
   // Verification images and videos
   const imageFiles = Array.isArray(data.images) ? data.images : [];
-  const videoFiles = Array.isArray(data.videos) ? data.videos : (data.videoUrl ? [{ url: data.videoUrl }] : []);
+  const videoFiles = Array.isArray(data.videos) ? data.videos : data.videoUrl ? [{ url: data.videoUrl }] : [];
 
   // Primary review target info if available
   const currentTarget = data.review?.targets?.find((t) => t.submissionId === id) || data.review?.targets?.[0];
@@ -368,25 +398,33 @@ export default function VerificationDetail() {
               label="ID document type"
               value={primaryDoc.documentType || primaryDoc.documentTypeId || data.idDocumentType || data.idDocumentTypeId}
             />
-            <Info
-              label="Government document status"
-              value={primaryDoc.status || data.governmentDocumentStatus}
-            />
+            <Info label="Government document status" value={primaryDoc.status || data.governmentDocumentStatus} />
             {((primaryDoc.documentRevision !== undefined && primaryDoc.documentRevision !== null) ||
               (primaryDoc.revision !== undefined && primaryDoc.revision !== null) ||
               (data.documentRevision !== undefined && data.documentRevision !== null)) && (
-                <Info
-                  label="Document revision"
-                  value={`Revision ${primaryDoc.documentRevision ?? primaryDoc.revision ?? data.documentRevision}`}
-                />
-              )}
+              <Info
+                label="Document revision"
+                value={`Revision ${primaryDoc.documentRevision ?? primaryDoc.revision ?? data.documentRevision}`}
+              />
+            )}
             <Info
               label="Reviewed by"
-              value={currentTarget?.reviewedByUser?.name || currentTarget?.reviewedByUser?.email || data.reviewedByUser?.name || data.reviewedByUser?.email}
+              value={
+                currentTarget?.reviewedByUser?.name ||
+                currentTarget?.reviewedByUser?.email ||
+                data.reviewedByUser?.name ||
+                data.reviewedByUser?.email
+              }
             />
             <Info
               label="Reviewed at"
-              value={currentTarget?.reviewedAt ? fmtDateTime(currentTarget.reviewedAt) : (data.reviewedAt ? fmtDateTime(data.reviewedAt) : undefined)}
+              value={
+                currentTarget?.reviewedAt
+                  ? fmtDateTime(currentTarget.reviewedAt)
+                  : data.reviewedAt
+                    ? fmtDateTime(data.reviewedAt)
+                    : undefined
+              }
             />
           </div>
 
@@ -395,12 +433,6 @@ export default function VerificationDetail() {
               <Info label="Admin notes" value={currentTarget?.adminNotes || data.adminNotes} />
             </div>
           )}
-
-          {/* {(primaryDoc.rejectionReason || data.governmentDocumentRejectionReason) && (
-            <p className="mt-3 rounded-lg bg-danger-tint px-3 py-2 text-sm text-danger-ink">
-              <b>Rejection reason:</b> {primaryDoc.rejectionReason || data.governmentDocumentRejectionReason}
-            </p>
-          )} */}
         </section>
 
         {/* Evidence Card */}
@@ -409,45 +441,28 @@ export default function VerificationDetail() {
           <div className="space-y-4">
             <FileButtons
               label="Government document"
-              items={govDocs.length > 0 ? govDocs : (data.idDocumentImageUrl ? [{ url: data.idDocumentImageUrl }] : [])}
+              items={govDocs.length > 0 ? govDocs : data.idDocumentImageUrl ? [{ url: data.idDocumentImageUrl }] : []}
               prefix="File"
             />
-            <FileButtons
-              label="Certificate files"
-              items={certificateFiles}
-              prefix="File"
-            />
-            <LinkList
-              label="Certificate links"
-              items={certificateLinks}
-            />
-            <FileButtons
-              label="Verification images"
-              items={imageFiles}
-              prefix="File"
-            />
-            {videoFiles.length > 0 && (
-              <FileButtons
-                label="Verification videos"
-                items={videoFiles}
-                prefix="Video"
-              />
-            )}
+            <FileButtons label="Certificate files" items={certificateFiles} prefix="File" />
+            <LinkList label="Certificate links" items={certificateLinks} />
+            <FileButtons label="Verification images" items={imageFiles} prefix="File" />
+            {videoFiles.length > 0 && <FileButtons label="Verification videos" items={videoFiles} prefix="Video" />}
           </div>
         </section>
 
         {/* Government Document Review */}
         <section className="card p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold">
-              Government document{govDocs.length > 1 ? `s (${govDocs.length})` : ""}
-            </h2>
+            <h2 className="font-semibold">Government document{govDocs.length > 1 ? `s (${govDocs.length})` : ""}</h2>
             {govDocs.length <= 1 && primaryDoc.status && <Badge status={primaryDoc.status} />}
           </div>
           <p className="mb-3 text-sm text-slate-500">
             Reviews the ID document on this submission.
             {govDocs.length <= 1 &&
-              (primaryDoc.documentRevision !== undefined || primaryDoc.revision !== undefined || data.documentRevision !== undefined) && (
+              (primaryDoc.documentRevision !== undefined ||
+                primaryDoc.revision !== undefined ||
+                data.documentRevision !== undefined) && (
                 <span className="ml-1 font-medium text-slate-700">
                   (Revision {primaryDoc.documentRevision ?? primaryDoc.revision ?? data.documentRevision})
                 </span>
@@ -458,15 +473,14 @@ export default function VerificationDetail() {
               {govDocs.map((doc, idx) => {
                 const docId = doc.id || doc._id || doc.documentId || idx;
                 const revision = doc.documentRevision ?? doc.revision;
+                const key = govKey(doc);
                 return (
                   <div key={docId} className="rounded-lg border border-slate-200 p-3">
                     <div className="mb-2 flex items-center justify-between">
                       <p className="text-sm font-medium text-slate-700">
                         {doc.documentType || `Document #${idx + 1}`}
                         {revision !== undefined && (
-                          <span className="ml-2 text-xs font-normal text-slate-400">
-                            (Rev {revision})
-                          </span>
+                          <span className="ml-2 text-xs font-normal text-slate-400">(Rev {revision})</span>
                         )}
                       </p>
                       {doc.status && <Badge status={doc.status} />}
@@ -479,7 +493,8 @@ export default function VerificationDetail() {
                     {canReview ? (
                       <ReviewAction
                         key={`gov-doc-${docId}-${revision ?? 0}`}
-                        pending={busy}
+                        pending={busyKey === key}
+                        disabled={anyBusy && busyKey !== key}
                         onSubmit={(status, reason) => govDocReview(doc, status, reason)}
                       />
                     ) : (
@@ -499,7 +514,8 @@ export default function VerificationDetail() {
               {canReview ? (
                 <ReviewAction
                   key={`gov-doc-${primaryDoc.id || primaryDoc._id || id}-${primaryDoc.documentRevision ?? primaryDoc.revision ?? data.documentRevision ?? 0}`}
-                  pending={busy}
+                  pending={busyKey === govKey(primaryDoc)}
+                  disabled={anyBusy && busyKey !== govKey(primaryDoc)}
                   onSubmit={govDocReview}
                 />
               ) : (
@@ -517,12 +533,15 @@ export default function VerificationDetail() {
             {skills.map((s) => {
               const skillId = s.id || s._id;
               const skillRejection = s.rejectionReason || s.reason || s.adminNotes;
+              const key = skillKey(skillId);
               return (
                 <div key={skillId} className="rounded-lg border border-slate-200 p-3">
                   <div className="mb-2 flex items-center justify-between">
                     <p className="text-sm font-medium text-slate-700">
                       {s.name || skillId}
-                      {s.category && <span className="ml-2 text-xs font-normal capitalize text-slate-400">{s.category}</span>}
+                      {s.category && (
+                        <span className="ml-2 text-xs font-normal capitalize text-slate-400">{s.category}</span>
+                      )}
                     </p>
                     {s.displayStatus && <Badge status={s.displayStatus} />}
                   </div>
@@ -534,7 +553,8 @@ export default function VerificationDetail() {
                   {canReview ? (
                     <ReviewAction
                       key={`${skillId}-${s.verificationId || s.displayStatus || s.status}`}
-                      pending={busy}
+                      pending={busyKey === key}
+                      disabled={anyBusy && busyKey !== key}
                       onSubmit={(status, reason) => skillReview(s, status, reason)}
                     />
                   ) : (
@@ -556,7 +576,8 @@ export default function VerificationDetail() {
           {canReview ? (
             <ReviewAction
               options={["approved", "rejected"]}
-              pending={busy}
+              pending={busyKey === BULK_KEY}
+              disabled={anyBusy && busyKey !== BULK_KEY}
               onSubmit={(status, reason) => bulkReview(status === "approved" ? "approve" : "reject", reason)}
             />
           ) : (
@@ -567,5 +588,3 @@ export default function VerificationDetail() {
     </>
   );
 }
-
-
